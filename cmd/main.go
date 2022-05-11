@@ -6,7 +6,6 @@ import (
 )
 
 func main() {
-	log.SetLevel(log.DebugLevel)
 	operator := dockerOperator.NewOperator()
 
 	containers := operator.Ps()

@@ -7,13 +7,15 @@ import (
 
 type ContainerInfo struct {
 	ShortId string
+	Id      string
+	Names   []string
 	Image   string
 	Labels  map[string]string
 }
 
 func NewContainerInfo(container *types.Container) *ContainerInfo {
 	shortId := container.ID[:6]
-	return &ContainerInfo{ShortId: shortId, Image: container.Image, Labels: container.Labels}
+	return &ContainerInfo{Id: container.ID, ShortId: shortId, Image: container.Image, Labels: container.Labels, Names: container.Names}
 }
 
 func (c ContainerInfo) String() string {

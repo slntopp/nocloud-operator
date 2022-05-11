@@ -16,7 +16,8 @@ const (
 )
 
 type Operator struct {
-	client *dockerClient.Client
+	client     *dockerClient.Client
+	containers map[string]ContainerInfo
 }
 
 func NewOperator() *Operator {
@@ -24,22 +25,20 @@ func NewOperator() *Operator {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &Operator{client: cli}
+	return &Operator{client: cli, containers: map[string]ContainerInfo{}}
 }
 
-func (o *Operator) Ps() []ContainerInfo {
+func (o *Operator) Ps() map[string]ContainerInfo {
 	ctx := context.Background()
 	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var result []ContainerInfo
-
 	for _, container := range containers {
-		result = append(result, *NewContainerInfo(&container))
+		o.containers[container.ID] = *NewContainerInfo(&container)
 	}
-	return result
+	return o.containers
 }
 
 func (o *Operator) ObserveContainers() {
@@ -49,7 +48,7 @@ func (o *Operator) ObserveContainers() {
 		select {
 		case event := <-eventsChan:
 			if event.Type == TYPE_CONTAINER && (event.Action == ACTION_START || event.Action == ACTION_STOP) {
-				processEvent(ctx, o.client, event)
+				o.processEvent(ctx, event)
 			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
@@ -59,14 +58,15 @@ func (o *Operator) ObserveContainers() {
 	}
 }
 
-func processEvent(ctx context.Context, client *dockerClient.Client, event events.Message) {
+func (o *Operator) processEvent(ctx context.Context, event events.Message) {
 	if event.Action == ACTION_STOP {
-		log.Println("Container stopped")
-		log.Println("ID: " + event.ID)
+		names := o.containers[event.ID].Names
+		log.Printf("Container stopped ID: %s Names:%v", event.ID, names)
+		delete(o.containers, event.ID)
 		return
 	}
 
-	containers, err := client.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		log.Fatal("Error")
 	}
@@ -74,9 +74,10 @@ func processEvent(ctx context.Context, client *dockerClient.Client, event events
 	for _, value := range containers {
 		if value.ID == event.ID {
 			container = NewContainerInfo(&value)
+			break
 		}
 	}
-
+	o.containers[container.Id] = *container
 	log.Println("Container started")
 	log.Println(container)
 	return
