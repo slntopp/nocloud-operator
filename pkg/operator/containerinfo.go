@@ -23,5 +23,5 @@ func (c ContainerInfo) String() string {
 	for key, value := range c.Labels {
 		labels += fmt.Sprintf("\tLKey: %s\t LValue: %s\n", key, value)
 	}
-	return fmt.Sprintf("ID:%v\nImage:%v\nLabels:\n%v", c.ShortId, c.Image, labels)
+	return fmt.Sprintf("Names:%v\nID:%v\nImage:%v\nLabels:\n%v", c.Names, c.ShortId, c.Image, labels)
 }
