@@ -14,4 +14,6 @@ func main() {
 	for _, container := range containers {
 		log.Println(container)
 	}
+
+	operator.ObserveContainers()
 }
