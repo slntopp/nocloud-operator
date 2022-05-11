@@ -2,7 +2,6 @@ package operator
 
 import (
 	"context"
-
 	"github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
 	log "github.com/sirupsen/logrus"
@@ -20,12 +19,17 @@ func NewOperator() *Operator {
 	return &Operator{client: cli}
 }
 
-func (o *Operator) Ps() []types.Container {
+func (o *Operator) Ps() []ContainerInfo {
 	ctx := context.Background()
 	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return containers
+	var result []ContainerInfo
+
+	for _, container := range containers {
+		result = append(result, *NewContainerInfo(&container))
+	}
+	return result
 }
