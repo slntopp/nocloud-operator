@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
+	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
 	log "github.com/sirupsen/logrus"
 )
@@ -66,17 +67,17 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message) {
 		return
 	}
 
-	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
+	filters := dockerFilters.NewArgs()
+	filters.Add("id", event.ID)
+
+	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters,
+	})
 	if err != nil {
 		log.Fatal("Error")
 	}
 	var container *ContainerInfo
-	for _, value := range containers {
-		if value.ID == event.ID {
-			container = NewContainerInfo(&value)
-			break
-		}
-	}
+	container = NewContainerInfo(&containers[0])
 	o.containers[container.Id] = *container
 	log.Println("Container started")
 	log.Println(container)
