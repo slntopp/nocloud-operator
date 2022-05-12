@@ -83,11 +83,11 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message) {
 	o.containers[container.Id] = *container
 	log.Println("Container started")
 	log.Println(container)
-	o.CheckHash(ctx, container.Id)
+	o.checkHash(ctx, container.Id)
 	return
 }
 
-func (o *Operator) CheckHash(ctx context.Context, containerId string) {
+func (o *Operator) checkHash(ctx context.Context, containerId string) {
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
 		return
