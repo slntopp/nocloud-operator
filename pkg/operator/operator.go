@@ -127,8 +127,9 @@ func getImageTag(imageFullName string) string {
 
 func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, containerId string) {
 	images := o.getImages(ctx, imageName)
-	if len(images) == 0 {
+	if len(images) == 1 {
 		log.Println("Container has latest image")
+		return
 	}
 
 	var oldImage types.ImageSummary
