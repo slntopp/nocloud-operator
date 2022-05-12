@@ -45,22 +45,6 @@ func (o *Operator) Ps() map[string]ContainerInfo {
 	return o.containers
 }
 
-func (o *Operator) Images() {
-	ctx := context.Background()
-	filters := dockerFilters.NewArgs()
-	filters.Add("reference", "ghcr.io/slntopp/nocloud/apiserver-web")
-	images, err := o.client.ImageList(ctx, types.ImageListOptions{Filters: filters})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, image := range images {
-		fmt.Println(image.ID)
-		fmt.Println(image.RepoTags)
-		fmt.Println("/-------------------------------------------/")
-	}
-}
-
 func (o *Operator) ObserveContainers() {
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
@@ -117,6 +101,7 @@ func (o *Operator) CheckHash(ctx context.Context, containerId string) {
 	imageFullName := image.RepoTags[0]
 	imageName := getImageName(imageFullName)
 	o.pullImage(ctx, imageName)
+	o.updateImageAndContainer(ctx, imageName, containerId)
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
@@ -133,4 +118,46 @@ func (o *Operator) pullImage(ctx context.Context, imageName string) {
 func getImageName(imageFullName string) string {
 	splitedName := strings.Split(imageFullName, ":")
 	return splitedName[0]
+}
+
+func getImageTag(imageFullName string) string {
+	splitedName := strings.Split(imageFullName, ":")
+	return splitedName[1]
+}
+
+func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, containerId string) {
+	images := o.getImages(ctx, imageName)
+	if len(images) == 0 {
+		log.Println("Container has latest image")
+	}
+
+	var oldImage types.ImageSummary
+
+	for _, image := range images {
+		tag := getImageTag(image.RepoTags[0])
+		if tag == "latest" {
+			continue
+		}
+		oldImage = image
+	}
+
+	err := o.client.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{})
+	if err != nil {
+		return
+	}
+
+	_, err = o.client.ImageRemove(ctx, oldImage.ID, types.ImageRemoveOptions{})
+	if err != nil {
+		return
+	}
+}
+
+func (o *Operator) getImages(ctx context.Context, imageName string) []types.ImageSummary {
+	filters := dockerFilters.NewArgs()
+	filters.Add("reference", imageName)
+	images, err := o.client.ImageList(ctx, types.ImageListOptions{Filters: filters})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return images
 }
