@@ -98,8 +98,7 @@ func (o *Operator) CheckHash(ctx context.Context, containerId string) {
 		return
 	}
 
-	imageFullName := image.RepoTags[0]
-	imageName := getImageName(imageFullName)
+	imageName := getImageName(image.RepoTags[0])
 	o.pullImage(ctx, imageName)
 	o.updateImageAndContainer(ctx, imageName, containerId)
 }
@@ -132,14 +131,15 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		return
 	}
 
-	var oldImage types.ImageSummary
+	var oldImageId string
 
 	for _, image := range images {
 		tag := getImageTag(image.RepoTags[0])
 		if tag == "latest" {
 			continue
 		}
-		oldImage = image
+		oldImageId = image.ID
+		break
 	}
 
 	err := o.client.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{})
@@ -147,7 +147,7 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		return
 	}
 
-	_, err = o.client.ImageRemove(ctx, oldImage.ID, types.ImageRemoveOptions{})
+	_, err = o.client.ImageRemove(ctx, oldImageId, types.ImageRemoveOptions{})
 	if err != nil {
 		return
 	}
