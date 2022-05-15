@@ -3,18 +3,21 @@ package operator
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/events"
-	dockerFilters "github.com/docker/docker/api/types/filters"
-	dockerClient "github.com/docker/docker/client"
-	"github.com/gorobot-nz/docker-operator/pkg/parser"
-	log "github.com/sirupsen/logrus"
+	"github.com/docker/go-connections/nat"
 	"gopkg.in/yaml.v3"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/docker/docker/api/types"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/events"
+	dockerFilters "github.com/docker/docker/api/types/filters"
+	dockerClient "github.com/docker/docker/client"
+	"github.com/gorobot-nz/docker-operator/pkg/parser"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -175,6 +178,17 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	if err != nil {
 		return
 	}
+
+	containerConfig, containerName := o.getContainerConfig(imageName)
+
+	create, err := o.client.ContainerCreate(ctx, containerConfig, nil, nil, nil, containerName)
+	if err != nil {
+		return
+	}
+
+	if err := o.client.ContainerStart(ctx, create.ID, types.ContainerStartOptions{}); err != nil {
+		panic(err)
+	}
 }
 
 func (o *Operator) getImages(ctx context.Context, imageName string) []types.ImageSummary {
@@ -185,4 +199,28 @@ func (o *Operator) getImages(ctx context.Context, imageName string) []types.Imag
 		log.Fatal(err)
 	}
 	return images
+}
+
+func (o *Operator) getContainerConfig(imageName string) (*dockerContainer.Config, string) {
+	for _, serviceConfig := range o.composeConfig.Services {
+		if serviceConfig.Image == imageName {
+			containerConfig := &dockerContainer.Config{}
+			containerConfig.Image = serviceConfig.Image
+			portSet := nat.PortSet{}
+			for _, configPort := range serviceConfig.Ports {
+				port := nat.Port(configPort)
+				portSet[port] = struct{}{}
+			}
+			containerConfig.ExposedPorts = portSet
+			containerConfig.Env = serviceConfig.Environment
+			containerConfig.Cmd = strings.Split(serviceConfig.Command, " ")
+			volumesMap := make(map[string]struct{})
+			for _, configVolume := range serviceConfig.Volumes {
+				volumesMap[configVolume] = struct{}{}
+			}
+			containerConfig.Volumes = volumesMap
+			return containerConfig, serviceConfig.ContainerName
+		}
+	}
+	return nil, ""
 }
