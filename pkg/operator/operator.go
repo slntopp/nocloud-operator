@@ -7,10 +7,14 @@ import (
 	"github.com/docker/docker/api/types/events"
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
+	"github.com/gorobot-nz/docker-operator/pkg/parser"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 )
 
 const (
@@ -20,8 +24,9 @@ const (
 )
 
 type Operator struct {
-	client     *dockerClient.Client
-	containers map[string]ContainerInfo
+	client        *dockerClient.Client
+	containers    map[string]ContainerInfo
+	composeConfig parser.Config
 }
 
 func NewOperator() *Operator {
@@ -30,6 +35,20 @@ func NewOperator() *Operator {
 		log.Fatal(err)
 	}
 	return &Operator{client: cli, containers: map[string]ContainerInfo{}}
+}
+
+func (o *Operator) ReadConfig(path string) {
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var data parser.Config
+	err = yaml.Unmarshal(bytes, &data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	o.composeConfig = data
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {
@@ -46,13 +65,14 @@ func (o *Operator) Ps() map[string]ContainerInfo {
 }
 
 func (o *Operator) ObserveContainers() {
+	var mutex sync.Mutex
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
 	for {
 		select {
 		case event := <-eventsChan:
 			if event.Type == TYPE_CONTAINER && (event.Action == ACTION_START || event.Action == ACTION_STOP) {
-				o.processEvent(ctx, event)
+				go o.processEvent(ctx, event, &mutex)
 			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
@@ -62,11 +82,13 @@ func (o *Operator) ObserveContainers() {
 	}
 }
 
-func (o *Operator) processEvent(ctx context.Context, event events.Message) {
+func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex *sync.Mutex) {
 	if event.Action == ACTION_STOP {
 		names := o.containers[event.ID].Names
 		log.Printf("Container stopped ID: %s Names:%v", event.ID, names)
+		mutex.Lock()
 		delete(o.containers, event.ID)
+		mutex.Unlock()
 		return
 	}
 
@@ -80,10 +102,12 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message) {
 		log.Fatal("Error")
 	}
 	container := NewContainerInfo(&containers[0])
+	mutex.Lock()
 	o.containers[container.Id] = *container
+	mutex.Unlock()
 	log.Println("Container started")
 	log.Println(container)
-	o.checkHash(ctx, container.Id)
+	//o.checkHash(ctx, container.Id)
 	return
 }
 
