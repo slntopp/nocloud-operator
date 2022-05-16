@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
@@ -75,7 +76,7 @@ func (o *Operator) ObserveContainers() {
 		select {
 		case event := <-eventsChan:
 			if event.Type == TYPE_CONTAINER && (event.Action == ACTION_START || event.Action == ACTION_STOP) {
-				go o.processEvent(ctx, event, &mutex)
+				o.processEvent(ctx, event, &mutex)
 			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
@@ -95,26 +96,18 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex
 		return
 	}
 
-	filters := dockerFilters.NewArgs()
-	filters.Add("id", event.ID)
-
-	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filters,
-	})
-	if err != nil {
-		log.Fatal("Error")
-	}
-	container := NewContainerInfo(&containers[0])
+	container := o.getContainerInfo(ctx, event.ID)
+	containerInfo := NewContainerInfo(&container)
 	mutex.Lock()
-	o.containers[container.Id] = *container
+	o.containers[containerInfo.Id] = *containerInfo
 	mutex.Unlock()
 	log.Println("Container started")
-	log.Println(container)
-	//o.checkHash(ctx, container.Id)
+	log.Println(containerInfo)
+	o.checkHash(ctx, containerInfo.Id, mutex)
 	return
 }
 
-func (o *Operator) checkHash(ctx context.Context, containerId string) {
+func (o *Operator) checkHash(ctx context.Context, containerId string, mutex *sync.Mutex) {
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
 		return
@@ -127,7 +120,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 
 	imageName := getImageName(image.RepoTags[0])
 	o.pullImage(ctx, imageName)
-	o.updateImageAndContainer(ctx, imageName, containerId)
+	o.updateImageAndContainer(ctx, imageName, containerId, mutex)
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
@@ -151,7 +144,7 @@ func getImageTag(imageFullName string) string {
 	return splitedName[1]
 }
 
-func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, containerId string) {
+func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, containerId string, mutex *sync.Mutex) {
 	images := o.getImages(ctx, imageName)
 	if len(images) == 1 {
 		log.Println("Container has latest image")
@@ -169,17 +162,24 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		break
 	}
 
-	err := o.client.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{})
+	containerConfig, containerName := o.getContainerConfig(imageName)
+
+	duration := 5 * time.Second
+	err := o.client.ContainerStop(ctx, containerId, &duration)
 	if err != nil {
 		return
 	}
 
+	err = o.client.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{})
+	if err != nil {
+		return
+	}
+
+	fmt.Println(oldImageId)
 	_, err = o.client.ImageRemove(ctx, oldImageId, types.ImageRemoveOptions{})
 	if err != nil {
 		return
 	}
-
-	containerConfig, containerName := o.getContainerConfig(imageName)
 
 	create, err := o.client.ContainerCreate(ctx, containerConfig, nil, nil, nil, containerName)
 	if err != nil {
@@ -189,6 +189,13 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	if err := o.client.ContainerStart(ctx, create.ID, types.ContainerStartOptions{}); err != nil {
 		panic(err)
 	}
+
+	mutex.Lock()
+	newContainer := o.getContainerInfo(ctx, create.ID)
+	newContainerInfo := NewContainerInfo(&newContainer)
+	o.containers[create.ID] = *newContainerInfo
+	mutex.Unlock()
+
 }
 
 func (o *Operator) getImages(ctx context.Context, imageName string) []types.ImageSummary {
@@ -203,7 +210,7 @@ func (o *Operator) getImages(ctx context.Context, imageName string) []types.Imag
 
 func (o *Operator) getContainerConfig(imageName string) (*dockerContainer.Config, string) {
 	for _, serviceConfig := range o.composeConfig.Services {
-		if serviceConfig.Image == imageName {
+		if strings.HasPrefix(serviceConfig.Image, imageName) {
 			containerConfig := &dockerContainer.Config{}
 			containerConfig.Image = serviceConfig.Image
 			portSet := nat.PortSet{}
@@ -223,4 +230,18 @@ func (o *Operator) getContainerConfig(imageName string) (*dockerContainer.Config
 		}
 	}
 	return nil, ""
+}
+
+func (o *Operator) getContainerInfo(ctx context.Context, containerId string) types.Container {
+
+	filters := dockerFilters.NewArgs()
+	filters.Add("id", containerId)
+
+	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters,
+	})
+	if err != nil {
+		log.Fatal("Error")
+	}
+	return containers[0]
 }
