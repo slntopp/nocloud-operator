@@ -76,7 +76,7 @@ func (o *Operator) ObserveContainers() {
 		select {
 		case event := <-eventsChan:
 			if event.Type == TYPE_CONTAINER && (event.Action == ACTION_START || event.Action == ACTION_STOP) {
-				o.processEvent(ctx, event, &mutex)
+				go o.processEvent(ctx, event, &mutex)
 			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
