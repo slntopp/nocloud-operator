@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -113,14 +114,17 @@ func (o *Operator) checkHash(ctx context.Context, containerId string, mutex *syn
 		return
 	}
 
+	createConfig := NewCreateContainerConfig(container.Config, container.HostConfig, &network.NetworkingConfig{
+		EndpointsConfig: container.NetworkSettings.Networks,
+	})
+
 	image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
 	if err != nil {
 		return
 	}
 
-	imageName := getImageName(image.RepoTags[0])
-	o.pullImage(ctx, imageName)
-	o.updateImageAndContainer(ctx, imageName, containerId, mutex)
+	o.pullImage(ctx, image.RepoTags[0])
+	o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, createConfig, mutex)
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
@@ -144,22 +148,11 @@ func getImageTag(imageFullName string) string {
 	return splitedName[1]
 }
 
-func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, containerId string, mutex *sync.Mutex) {
-	images := o.getImages(ctx, imageName)
-	if len(images) == 1 {
-		log.Println("Container has latest image")
+func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, createCfg *CreateContainerConfig, mutex *sync.Mutex) {
+	image := o.getImage(ctx, imageName)
+	if image.ID == imageId {
+		log.Println("Container is up to date")
 		return
-	}
-
-	var oldImageId string
-
-	for _, image := range images {
-		tag := getImageTag(image.RepoTags[0])
-		if tag == "latest" {
-			continue
-		}
-		oldImageId = image.ID
-		break
 	}
 
 	containerConfig, containerName := o.getContainerConfig(imageName)
@@ -175,13 +168,16 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		return
 	}
 
-	fmt.Println(oldImageId)
-	_, err = o.client.ImageRemove(ctx, oldImageId, types.ImageRemoveOptions{})
+	_, err = o.client.ImageRemove(ctx, imageId, types.ImageRemoveOptions{})
 	if err != nil {
 		return
 	}
 
-	create, err := o.client.ContainerCreate(ctx, containerConfig, nil, nil, nil, containerName)
+	createCfg.Cfg.Hostname = ""
+
+	create, err := o.client.ContainerCreate(ctx, containerConfig, createCfg.HostCfg, &network.NetworkingConfig{
+		EndpointsConfig: make(map[string]*network.EndpointSettings, 0),
+	}, nil, containerName)
 	if err != nil {
 		return
 	}
@@ -198,14 +194,14 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 
 }
 
-func (o *Operator) getImages(ctx context.Context, imageName string) []types.ImageSummary {
+func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSummary {
 	filters := dockerFilters.NewArgs()
 	filters.Add("reference", imageName)
 	images, err := o.client.ImageList(ctx, types.ImageListOptions{Filters: filters})
 	if err != nil {
 		log.Fatal(err)
 	}
-	return images
+	return images[0]
 }
 
 func (o *Operator) getContainerConfig(imageName string) (*dockerContainer.Config, string) {
