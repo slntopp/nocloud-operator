@@ -8,8 +8,6 @@ import (
 func main() {
 	operator := dockerOperator.NewOperator()
 
-	operator.ReadConfig("docker-compose.yml")
-
 	containers := operator.Ps()
 	for _, container := range containers {
 		log.Println(container)

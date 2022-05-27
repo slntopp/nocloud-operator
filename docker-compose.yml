@@ -1,9 +1,13 @@
 version: "3.8"
 services:
-  db:
-    container_name: postgres
-    image: postgres:latest
+  coredns:
     restart: always
-    command: "postgres"
-    environment:
-      - POSTGRES_PASSWORD=qwerty
+    image: coredns/coredns
+    command: -conf coredns-config/Corefile
+    volumes:
+      - ./Corefile:/coredns-config/Corefile
+  alpine:
+    image: alpine:latest
+    command: "/bin/sh"
+    dns:
+      - 172.19.0.3
