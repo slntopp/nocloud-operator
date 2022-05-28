@@ -15,3 +15,6 @@ health_inspect_another:
 
 health_connect:
 	docker network connect nocloud_n_ione_grpc-internal health-service && docker network connect nocloud_n_ione_proxy health-service
+
+pull_health:
+	docker rmi ghcr.io/slntopp/nocloud/health:latest && docker pull ghcr.io/slntopp/nocloud/health:dev-update-service && docker tag ghcr.io/slntopp/nocloud/health:dev-update-service ghcr.io/slntopp/nocloud/health:latest && docker rmi ghcr.io/slntopp/nocloud/health:dev-update-service
