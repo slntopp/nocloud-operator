@@ -42,7 +42,7 @@ func NewOperator() *Operator {
 	return &Operator{client: cli, containers: map[string]ContainerInfo{}}
 }
 
-func (o *Operator) ReadConfig(path string) {
+func (o *Operator) readConfig(path string) {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
@@ -171,8 +171,8 @@ func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSu
 	return images[0]
 }
 
-func (o *Operator) GetContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]*network.EndpointSettings, string) {
-	o.ReadConfig("docker-compose.yml")
+func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}, string) {
+	o.readConfig("docker-compose.yml")
 
 	for _, serviceConfig := range o.composeConfig.Services {
 		if strings.HasSuffix(serviceConfig.Image, imageName) {
@@ -191,11 +191,11 @@ func (o *Operator) GetContainerComposeConfig(imageName string) (*dockerContainer
 				volumesMap[configVolume] = struct{}{}
 			}
 			containerConfig.Volumes = volumesMap
-			endpointsCfg := make(map[string]*network.EndpointSettings, 0)
+			networks := make(map[string]struct{}, 0)
 			for _, value := range serviceConfig.Networks {
-				endpointsCfg["nocloud_n_ione_"+value] = &network.EndpointSettings{}
+				networks["nocloud_n_ione_"+value] = struct{}{}
 			}
-			return containerConfig, &endpointsCfg, serviceConfig.ContainerName
+			return containerConfig, &networks, serviceConfig.ContainerName
 		}
 	}
 	return nil, nil, ""
@@ -234,7 +234,7 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 }
 
 func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig, mutex *sync.Mutex) error {
-	containerConfig, endpointsConfig, containerName := o.GetContainerComposeConfig(imageName)
+	containerConfig, endpointsConfig, containerName := o.getContainerComposeConfig(imageName)
 
 	create, err := o.client.ContainerCreate(ctx, containerConfig, hostCfg, nil, nil, containerName)
 	if err != nil {
@@ -258,7 +258,7 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	return nil
 }
 
-func (o *Operator) connectNetworks(ctx context.Context, containerId string, config *map[string]*network.EndpointSettings) error {
+func (o *Operator) connectNetworks(ctx context.Context, containerId string, config *map[string]struct{}) error {
 	networksList, err := o.client.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
 		return err
@@ -280,7 +280,7 @@ func (o *Operator) connectNetworks(ctx context.Context, containerId string, conf
 	return nil
 }
 
-func getNecessaryNetworks(list *[]types.NetworkResource, endpointsConfig map[string]*network.EndpointSettings) (string, []string) {
+func getNecessaryNetworks(list *[]types.NetworkResource, endpointsConfig map[string]struct{}) (string, []string) {
 	networkIds := make([]string, 0)
 	bridgeId := ""
 	for _, item := range *list {
