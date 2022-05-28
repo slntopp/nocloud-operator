@@ -13,5 +13,5 @@ func main() {
 		log.Println(container)
 	}
 
-	operator.ObserveContainers()
+	//operator.ObserveContainers()
 }

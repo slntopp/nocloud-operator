@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -98,7 +97,7 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex
 		return
 	}
 
-	container := o.getContainerInfo(ctx, event.ID)
+	container := o.getContainer(ctx, event.ID)
 	containerInfo := NewContainerInfo(&container)
 	mutex.Lock()
 	o.containers[containerInfo.Id] = *containerInfo
@@ -151,7 +150,7 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		return
 	}
 
-	containerConfig, networkingConfig, containerName := o.getContainerConfig(imageName)
+	containerConfig, networkingConfig, containerName := o.getContainerComposeConfig(imageName)
 
 	duration := 5 * time.Second
 	err := o.client.ContainerStop(ctx, containerId, &duration)
@@ -175,15 +174,14 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	}
 
 	if err := o.client.ContainerStart(ctx, create.ID, types.ContainerStartOptions{}); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	mutex.Lock()
-	newContainer := o.getContainerInfo(ctx, create.ID)
+	newContainer := o.getContainer(ctx, create.ID)
 	newContainerInfo := NewContainerInfo(&newContainer)
 	o.containers[create.ID] = *newContainerInfo
 	mutex.Unlock()
-
 }
 
 func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSummary {
@@ -196,12 +194,11 @@ func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSu
 	return images[0]
 }
 
-func (o *Operator) getContainerConfig(imageName string) (*dockerContainer.Config, *network.NetworkingConfig, string) {
-	configPath := path.Join("..", "..", "docker-compose.yml")
-	o.ReadConfig(configPath)
+func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *network.NetworkingConfig, string) {
+	o.ReadConfig("docker-compose.yml")
 
 	for _, serviceConfig := range o.composeConfig.Services {
-		if strings.HasPrefix(serviceConfig.Image, imageName) {
+		if strings.HasSuffix(serviceConfig.Image, imageName) {
 			containerConfig := &dockerContainer.Config{}
 			containerConfig.Image = serviceConfig.Image
 			containerConfig.Env = serviceConfig.Environment
@@ -219,7 +216,7 @@ func (o *Operator) getContainerConfig(imageName string) (*dockerContainer.Config
 			containerConfig.Volumes = volumesMap
 			endpointsCfg := make(map[string]*network.EndpointSettings, 0)
 			for _, value := range serviceConfig.Networks {
-				endpointsCfg[value] = &network.EndpointSettings{}
+				endpointsCfg["nocloud_n_ione_"+value] = &network.EndpointSettings{}
 			}
 			return containerConfig, &network.NetworkingConfig{EndpointsConfig: endpointsCfg}, serviceConfig.ContainerName
 		}
@@ -227,7 +224,7 @@ func (o *Operator) getContainerConfig(imageName string) (*dockerContainer.Config
 	return nil, nil, ""
 }
 
-func (o *Operator) getContainerInfo(ctx context.Context, containerId string) types.Container {
+func (o *Operator) getContainer(ctx context.Context, containerId string) types.Container {
 	filters := dockerFilters.NewArgs()
 	filters.Add("id", containerId)
 
