@@ -150,38 +150,15 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		return
 	}
 
-	containerConfig, networkingConfig, containerName := o.getContainerComposeConfig(imageName)
-
-	duration := 5 * time.Second
-	err := o.client.ContainerStop(ctx, containerId, &duration)
+	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
-		return
+		log.Fatalf(err.Error())
 	}
 
-	err = o.client.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{})
+	err = o.createNewContainer(ctx, imageName, hostCfg, mutex)
 	if err != nil {
-		return
+		log.Fatalf(err.Error())
 	}
-
-	_, err = o.client.ImageRemove(ctx, imageId, types.ImageRemoveOptions{})
-	if err != nil {
-		return
-	}
-
-	create, err := o.client.ContainerCreate(ctx, containerConfig, hostCfg, networkingConfig, nil, containerName)
-	if err != nil {
-		return
-	}
-
-	if err := o.client.ContainerStart(ctx, create.ID, types.ContainerStartOptions{}); err != nil {
-		log.Panic(err)
-	}
-
-	mutex.Lock()
-	newContainer := o.getContainer(ctx, create.ID)
-	newContainerInfo := NewContainerInfo(&newContainer)
-	o.containers[create.ID] = *newContainerInfo
-	mutex.Unlock()
 }
 
 func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSummary {
@@ -194,7 +171,7 @@ func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSu
 	return images[0]
 }
 
-func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *network.NetworkingConfig, string) {
+func (o *Operator) GetContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]*network.EndpointSettings, string) {
 	o.ReadConfig("docker-compose.yml")
 
 	for _, serviceConfig := range o.composeConfig.Services {
@@ -218,7 +195,7 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			for _, value := range serviceConfig.Networks {
 				endpointsCfg["nocloud_n_ione_"+value] = &network.EndpointSettings{}
 			}
-			return containerConfig, &network.NetworkingConfig{EndpointsConfig: endpointsCfg}, serviceConfig.ContainerName
+			return containerConfig, &endpointsCfg, serviceConfig.ContainerName
 		}
 	}
 	return nil, nil, ""
@@ -235,4 +212,85 @@ func (o *Operator) getContainer(ctx context.Context, containerId string) types.C
 		log.Fatal("Error")
 	}
 	return containers[0]
+}
+
+func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, imageId string) error {
+	duration := 5 * time.Second
+	err := o.client.ContainerStop(ctx, containerId, &duration)
+	if err != nil {
+		return err
+	}
+
+	err = o.client.ContainerRemove(ctx, containerId, types.ContainerRemoveOptions{})
+	if err != nil {
+		return err
+	}
+
+	_, err = o.client.ImageRemove(ctx, imageId, types.ImageRemoveOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig, mutex *sync.Mutex) error {
+	containerConfig, endpointsConfig, containerName := o.GetContainerComposeConfig(imageName)
+
+	create, err := o.client.ContainerCreate(ctx, containerConfig, hostCfg, nil, nil, containerName)
+	if err != nil {
+		return err
+	}
+
+	if err := o.client.ContainerStart(ctx, create.ID, types.ContainerStartOptions{}); err != nil {
+		return err
+	}
+
+	err = o.connectNetworks(ctx, create.ID, endpointsConfig)
+	if err != nil {
+		return err
+	}
+
+	mutex.Lock()
+	newContainer := o.getContainer(ctx, create.ID)
+	newContainerInfo := NewContainerInfo(&newContainer)
+	o.containers[create.ID] = *newContainerInfo
+	mutex.Unlock()
+	return nil
+}
+
+func (o *Operator) connectNetworks(ctx context.Context, containerId string, config *map[string]*network.EndpointSettings) error {
+	networksList, err := o.client.NetworkList(ctx, types.NetworkListOptions{})
+	if err != nil {
+		return err
+	}
+	bridgeId, networkIds := getNecessaryNetworks(&networksList, *config)
+
+	err = o.client.NetworkDisconnect(ctx, bridgeId, containerId, false)
+	if err != nil {
+		return err
+	}
+
+	for _, id := range networkIds {
+		err := o.client.NetworkConnect(ctx, id, containerId, &network.EndpointSettings{})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func getNecessaryNetworks(list *[]types.NetworkResource, endpointsConfig map[string]*network.EndpointSettings) (string, []string) {
+	networkIds := make([]string, 0)
+	bridgeId := ""
+	for _, item := range *list {
+		if item.Name == "bridge" {
+			bridgeId = item.ID
+			continue
+		}
+		if _, ok := endpointsConfig[item.Name]; ok {
+			networkIds = append(networkIds, item.ID)
+		}
+	}
+	return bridgeId, networkIds
 }
