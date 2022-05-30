@@ -178,7 +178,7 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 		if strings.HasSuffix(serviceConfig.Image, imageName) {
 			containerConfig := &dockerContainer.Config{}
 			containerConfig.Image = serviceConfig.Image
-			containerConfig.Env = serviceConfig.Environment
+			containerConfig.Env = convertEnvMapToString(serviceConfig.Environment)
 			containerConfig.Cmd = strings.Split(serviceConfig.Command, " ")
 			portSet := nat.PortSet{}
 			for _, configPort := range serviceConfig.Ports {
@@ -193,7 +193,7 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			containerConfig.Volumes = volumesMap
 			networks := make(map[string]struct{}, 0)
 			for _, value := range serviceConfig.Networks {
-				networks["nocloud_n_ione_"+value] = struct{}{}
+				networks["docker-operator_"+value] = struct{}{}
 			}
 			return containerConfig, &networks, serviceConfig.ContainerName
 		}
@@ -293,4 +293,34 @@ func getNecessaryNetworks(list *[]types.NetworkResource, endpointsConfig map[str
 		}
 	}
 	return bridgeId, networkIds
+}
+
+func convertEnvMapToString(envMap map[string]string) []string {
+	result := make([]string, 0)
+
+	for key, value := range envMap {
+		result = append(result, fmt.Sprintf("%s=%s", key, getEnvValue(value)))
+	}
+	return result
+}
+
+func getEnvValue(value string) string {
+	var result []rune
+	valueSymbols := []rune(value)
+
+	for i := 0; i < len(valueSymbols); i++ {
+		if valueSymbols[i] == '$' {
+			startIndex := i + 2
+			for valueSymbols[i] != '}' {
+				i++
+			}
+			endIndex := i
+			i++
+			result = append(result, []rune(os.Getenv(string(valueSymbols[startIndex:endIndex])))...)
+			continue
+		}
+		result = append(result, valueSymbols[i])
+	}
+
+	return string(result)
 }
