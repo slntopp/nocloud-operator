@@ -86,8 +86,8 @@ func (o *Operator) ObserveContainers() {
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
 
-	/*ticker := time.NewTicker(time.Duration(o.config.Duration) * time.Second)
-	defer ticker.Stop()*/
+	ticker := time.NewTicker(time.Duration(o.config.Duration) * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -95,14 +95,14 @@ func (o *Operator) ObserveContainers() {
 			if event.Type == TypeContainer && (event.Action == ActionStart || event.Action == ActionStop) {
 				go o.processEvent(ctx, event, &mutex)
 			}
-		/*case <-ticker.C:
-		list, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
-		if err != nil {
-			return
-		}
-		for _, container := range list {
-			go o.checkHash(ctx, container.ID)
-		}*/
+		case <-ticker.C:
+			list, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
+			if err != nil {
+				return
+			}
+			for _, container := range list {
+				go o.checkHash(ctx, container.ID)
+			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
 		default:
