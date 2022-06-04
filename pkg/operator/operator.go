@@ -54,20 +54,6 @@ func NewOperator() *Operator {
 	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data}
 }
 
-func (o *Operator) readComposeConfig(path string) Config {
-	bytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var data Config
-	err = yaml.Unmarshal(bytes, &data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return data
-}
-
 func (o *Operator) Ps() map[string]ContainerInfo {
 	ctx := context.Background()
 	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
@@ -194,14 +180,27 @@ func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSu
 	return images[0]
 }
 
+func (o *Operator) getContainer(ctx context.Context, containerId string) types.Container {
+	filters := dockerFilters.NewArgs()
+	filters.Add("id", containerId)
+
+	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters,
+	})
+	if err != nil {
+		log.Fatal("Error")
+	}
+	return containers[0]
+}
+
 func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}, string, *EndpointsConfig) {
-	composeConfig := o.readComposeConfig("docker-compose.yml")
+	composeConfig := readComposeConfig("docker-compose.yml")
 
 	for _, serviceConfig := range composeConfig.Services {
 		if strings.HasSuffix(serviceConfig.Image, imageName) {
 			containerConfig := &dockerContainer.Config{}
 			containerConfig.Image = serviceConfig.Image
-			containerConfig.Env = convertEnvMapToString(serviceConfig.Environment)
+			containerConfig.Env = convertEnvMapToArray(getEnvValues(serviceConfig.Environment))
 			if serviceConfig.Command != "" {
 				containerConfig.Cmd = strings.Split(serviceConfig.Command, " ")
 			}
@@ -220,7 +219,7 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			for _, value := range serviceConfig.Networks {
 				networks[o.config.ComposePrefix+value] = struct{}{}
 			}
-			containerConfig.Labels = getLabelsWithEnv(serviceConfig.Labels)
+			containerConfig.Labels = getEnvValues(serviceConfig.Labels)
 
 			var endpointsConfig EndpointsConfig
 			endpointsConfig.Links = serviceConfig.Links
@@ -229,19 +228,6 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 		}
 	}
 	return nil, nil, "", nil
-}
-
-func (o *Operator) getContainer(ctx context.Context, containerId string) types.Container {
-	filters := dockerFilters.NewArgs()
-	filters.Add("id", containerId)
-
-	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filters,
-	})
-	if err != nil {
-		log.Fatal("Error")
-	}
-	return containers[0]
 }
 
 func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, imageId string) error {
@@ -309,6 +295,20 @@ func (o *Operator) connectNetworks(ctx context.Context, containerId string, endp
 	return nil
 }
 
+func readComposeConfig(path string) Config {
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var data Config
+	err = yaml.Unmarshal(bytes, &data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return data
+}
+
 func getNecessaryNetworks(list *[]types.NetworkResource, endpointsNames map[string]struct{}) []string {
 	networkIds := make([]string, 0)
 	for _, item := range *list {
@@ -319,7 +319,7 @@ func getNecessaryNetworks(list *[]types.NetworkResource, endpointsNames map[stri
 	return networkIds
 }
 
-func convertEnvMapToString(envMap map[string]string) []string {
+func convertEnvMapToArray(envMap map[string]string) []string {
 	result := make([]string, 0)
 
 	for key, value := range envMap {
@@ -328,9 +328,9 @@ func convertEnvMapToString(envMap map[string]string) []string {
 	return result
 }
 
-func getLabelsWithEnv(labels map[string]string) map[string]string {
+func getEnvValues(environment map[string]string) map[string]string {
 	result := make(map[string]string, 0)
-	for key, value := range labels {
+	for key, value := range environment {
 		result[key] = getEnvValue(value)
 	}
 	return result
