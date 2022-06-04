@@ -128,7 +128,6 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex
 	mutex.Unlock()
 	log.Println("Container started")
 	log.Println(containerInfo)
-	o.checkHash(ctx, container.ID)
 	return
 }
 
