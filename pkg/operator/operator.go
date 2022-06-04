@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
@@ -18,7 +19,6 @@ import (
 	"github.com/docker/docker/api/types/events"
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
-	"github.com/gorobot-nz/docker-operator/pkg/parser"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,9 +29,9 @@ const (
 )
 
 type Operator struct {
-	client        *dockerClient.Client
-	containers    map[string]ContainerInfo
-	composeConfig parser.Config
+	client     *dockerClient.Client
+	containers map[string]ContainerInfo
+	config     OperatorConfig
 }
 
 func NewOperator() *Operator {
@@ -39,21 +39,33 @@ func NewOperator() *Operator {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &Operator{client: cli, containers: map[string]ContainerInfo{}}
+
+	bytes, err := ioutil.ReadFile("operator-config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var data OperatorConfig
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data}
 }
 
-func (o *Operator) readConfig(path string) {
+func (o *Operator) readComposeConfig(path string) Config {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var data parser.Config
+	var data Config
 	err = yaml.Unmarshal(bytes, &data)
 	if err != nil {
 		log.Fatal(err)
 	}
-	o.composeConfig = data
+	return data
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {
@@ -73,12 +85,24 @@ func (o *Operator) ObserveContainers() {
 	var mutex sync.Mutex
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
+
+	/*ticker := time.NewTicker(time.Duration(o.config.Duration) * time.Second)
+	defer ticker.Stop()*/
+
 	for {
 		select {
 		case event := <-eventsChan:
 			if event.Type == TypeContainer && (event.Action == ActionStart || event.Action == ActionStop) {
 				go o.processEvent(ctx, event, &mutex)
 			}
+		/*case <-ticker.C:
+		list, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
+		if err != nil {
+			return
+		}
+		for _, container := range list {
+			go o.checkHash(ctx, container.ID)
+		}*/
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
 		default:
@@ -104,11 +128,11 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex
 	mutex.Unlock()
 	log.Println("Container started")
 	log.Println(containerInfo)
-	o.checkHash(ctx, containerInfo.Id, mutex)
+	o.checkHash(ctx, container.ID)
 	return
 }
 
-func (o *Operator) checkHash(ctx context.Context, containerId string, mutex *sync.Mutex) {
+func (o *Operator) checkHash(ctx context.Context, containerId string) {
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
 		return
@@ -120,7 +144,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string, mutex *syn
 	}
 
 	o.pullImage(ctx, image.RepoTags[0])
-	o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig, mutex)
+	o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig)
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
@@ -143,7 +167,7 @@ func (o *Operator) pullImage(ctx context.Context, imageName string) {
 	}
 }
 
-func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, hostCfg *dockerContainer.HostConfig, mutex *sync.Mutex) {
+func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, hostCfg *dockerContainer.HostConfig) {
 	image := o.getImage(ctx, imageName)
 	if image.ID == imageId {
 		log.Println("Container is up to date")
@@ -155,7 +179,7 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		log.Fatalf(err.Error())
 	}
 
-	err = o.createNewContainer(ctx, imageName, hostCfg, mutex)
+	err = o.createNewContainer(ctx, imageName, hostCfg)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -171,15 +195,17 @@ func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSu
 	return images[0]
 }
 
-func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}, string) {
-	o.readConfig("docker-compose.yml")
+func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}, string, *EndpointsConfig) {
+	composeConfig := o.readComposeConfig("docker-compose.yml")
 
-	for _, serviceConfig := range o.composeConfig.Services {
+	for _, serviceConfig := range composeConfig.Services {
 		if strings.HasSuffix(serviceConfig.Image, imageName) {
 			containerConfig := &dockerContainer.Config{}
 			containerConfig.Image = serviceConfig.Image
 			containerConfig.Env = convertEnvMapToString(serviceConfig.Environment)
-			containerConfig.Cmd = strings.Split(serviceConfig.Command, " ")
+			if serviceConfig.Command != "" {
+				containerConfig.Cmd = strings.Split(serviceConfig.Command, " ")
+			}
 			portSet := nat.PortSet{}
 			for _, configPort := range serviceConfig.Ports {
 				port := nat.Port(configPort)
@@ -193,12 +219,17 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			containerConfig.Volumes = volumesMap
 			networks := make(map[string]struct{}, 0)
 			for _, value := range serviceConfig.Networks {
-				networks["docker-operator_"+value] = struct{}{}
+				networks[o.config.ComposePrefix+value] = struct{}{}
 			}
-			return containerConfig, &networks, serviceConfig.ContainerName
+			containerConfig.Labels = getLabelsWithEnv(serviceConfig.Labels)
+
+			var endpointsConfig EndpointsConfig
+			endpointsConfig.Links = serviceConfig.Links
+			endpointsConfig.Aliases = []string{serviceConfig.ContainerName}
+			return containerConfig, &networks, serviceConfig.ContainerName, &endpointsConfig
 		}
 	}
-	return nil, nil, ""
+	return nil, nil, "", nil
 }
 
 func (o *Operator) getContainer(ctx context.Context, containerId string) types.Container {
@@ -233,8 +264,8 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 	return nil
 }
 
-func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig, mutex *sync.Mutex) error {
-	containerConfig, endpointsConfig, containerName := o.getContainerComposeConfig(imageName)
+func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig) error {
+	containerConfig, networksNames, containerName, endpointsConfig := o.getContainerComposeConfig(imageName)
 
 	create, err := o.client.ContainerCreate(ctx, containerConfig, hostCfg, nil, nil, containerName)
 	if err != nil {
@@ -245,54 +276,48 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 		return err
 	}
 
-	err = o.connectNetworks(ctx, create.ID, endpointsConfig)
+	err = o.connectNetworks(ctx, create.ID, networksNames, endpointsConfig)
 	if err != nil {
 		return err
 	}
 
-	mutex.Lock()
-	newContainer := o.getContainer(ctx, create.ID)
-	newContainerInfo := NewContainerInfo(&newContainer)
-	o.containers[create.ID] = *newContainerInfo
-	mutex.Unlock()
 	return nil
 }
 
-func (o *Operator) connectNetworks(ctx context.Context, containerId string, config *map[string]struct{}) error {
+func (o *Operator) connectNetworks(ctx context.Context, containerId string, endpointsNames *map[string]struct{}, config *EndpointsConfig) error {
 	networksList, err := o.client.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
 		return err
 	}
-	bridgeId, networkIds := getNecessaryNetworks(&networksList, *config)
+	networkIds := getNecessaryNetworks(&networksList, *endpointsNames)
 
-	err = o.client.NetworkDisconnect(ctx, bridgeId, containerId, false)
+	inspectedContainer, err := o.client.ContainerInspect(ctx, containerId)
 	if err != nil {
 		return err
 	}
 
+	for _, value := range inspectedContainer.NetworkSettings.Networks {
+		o.client.NetworkDisconnect(ctx, value.NetworkID, containerId, true)
+	}
+
 	for _, id := range networkIds {
-		err := o.client.NetworkConnect(ctx, id, containerId, &network.EndpointSettings{})
-		if err != nil {
-			return err
-		}
+		o.client.NetworkConnect(ctx, id, containerId, &network.EndpointSettings{
+			Links:   config.Links,
+			Aliases: config.Aliases,
+		})
 	}
 
 	return nil
 }
 
-func getNecessaryNetworks(list *[]types.NetworkResource, endpointsConfig map[string]struct{}) (string, []string) {
+func getNecessaryNetworks(list *[]types.NetworkResource, endpointsNames map[string]struct{}) []string {
 	networkIds := make([]string, 0)
-	bridgeId := ""
 	for _, item := range *list {
-		if item.Name == "bridge" {
-			bridgeId = item.ID
-			continue
-		}
-		if _, ok := endpointsConfig[item.Name]; ok {
+		if _, ok := endpointsNames[item.Name]; ok {
 			networkIds = append(networkIds, item.ID)
 		}
 	}
-	return bridgeId, networkIds
+	return networkIds
 }
 
 func convertEnvMapToString(envMap map[string]string) []string {
@@ -300,6 +325,14 @@ func convertEnvMapToString(envMap map[string]string) []string {
 
 	for key, value := range envMap {
 		result = append(result, fmt.Sprintf("%s=%s", key, getEnvValue(value)))
+	}
+	return result
+}
+
+func getLabelsWithEnv(labels map[string]string) map[string]string {
+	result := make(map[string]string, 0)
+	for key, value := range labels {
+		result[key] = getEnvValue(value)
 	}
 	return result
 }
@@ -315,7 +348,6 @@ func getEnvValue(value string) string {
 				i++
 			}
 			endIndex := i
-			i++
 			result = append(result, []rune(os.Getenv(string(valueSymbols[startIndex:endIndex])))...)
 			continue
 		}

@@ -2,14 +2,15 @@ version: "3.8"
 services:
   proxy:
     image: traefik:latest
+    container_name: proxy
     restart: always
     labels:
-      - traefik.http.routers.api.rule=Host(`traefik.${BASE_DOMAIN}`)
-      - traefik.http.routers.api.entrypoints=http
-      - traefik.http.routers.api.service=api@internal
+      traefik.http.routers.api.rule: Host(`traefik.${BASE_DOMAIN}`)
+      traefik.http.routers.api.entrypoints: http
+      traefik.http.routers.api.service: api@internal
     ports:
-      - 80:80
-      - 8000:8000
+      - "80:80"
+      - "8000:8000"
     volumes:
       - ./traefik.yml:/traefik.yml
       - /var/run/docker.sock:/var/run/docker.sock
@@ -17,13 +18,14 @@ services:
       - proxy
 
   health:
+    container_name: health
     image: ghcr.io/slntopp/nocloud/health:latest
     restart: always
     labels:
-      - traefik.http.routers.health.rule=PathPrefix("/nocloud.health.")
-      - traefik.http.routers.health.entrypoints=grpc
-      - traefik.http.services.health.loadbalancer.server.port=8000
-      - traefik.http.services.health.loadbalancer.server.scheme=h2c
+      traefik.http.routers.health.rule: PathPrefix("/nocloud.health.")
+      traefik.http.routers.health.entrypoints: grpc
+      traefik.http.services.health.loadbalancer.server.port: 8000
+      traefik.http.services.health.loadbalancer.server.scheme: h2c
     environment:
       LOG_LEVEL: -1
       PORT: 8000
@@ -32,29 +34,33 @@ services:
     networks:
       - proxy
       - grpc-internal
+
   web:
     image: ghcr.io/slntopp/nocloud/apiserver-web:latest
+    container_name: web
     restart: always
     depends_on:
       - proxy
     labels:
-      - traefik.http.routers.web.rule=Host(`api.${BASE_DOMAIN}`)
-      - traefik.http.routers.web.entrypoints=http
-      - traefik.http.services.web.loadbalancer.server.port=8000
+      traefik.http.routers.web.rule: Host(`api.${BASE_DOMAIN}`)
+      traefik.http.routers.web.entrypoints: http
+      traefik.http.services.web.loadbalancer.server.port: 8000
     environment:
       LOG_LEVEL: -1
       WITH_BLOCK: "false"
       APISERVER_HOST: "proxy:8000"
     networks:
       - proxy
+
   registry:
+    container_name: registry
     image: ghcr.io/slntopp/nocloud/registry:latest
     restart: always
     labels:
-      - traefik.http.routers.registry.rule=PathPrefix("/nocloud.registry.")
-      - traefik.http.routers.registry.entrypoints=grpc
-      - traefik.http.services.registry.loadbalancer.server.port=8000
-      - traefik.http.services.registry.loadbalancer.server.scheme=h2c
+      traefik.http.routers.registry.rule: PathPrefix("/nocloud.registry.")
+      traefik.http.routers.registry.entrypoints: grpc
+      traefik.http.services.registry.loadbalancer.server.port: 8000
+      traefik.http.services.registry.loadbalancer.server.scheme: h2c
     environment:
       LOG_LEVEL: -1
       PORT: 8000
@@ -71,14 +77,16 @@ services:
       - grpc-internal
     links:
       - db
+
   services-registry:
+    container_name: services-registry
     image: ghcr.io/slntopp/nocloud/services-registry:latest
     restart: always
     labels:
-      - traefik.http.routers.services.rule=PathPrefix("/nocloud.services.")
-      - traefik.http.routers.services.entrypoints=grpc
-      - traefik.http.services.services.loadbalancer.server.port=8000
-      - traefik.http.services.services.loadbalancer.server.scheme=h2c
+      traefik.http.routers.services.rule: PathPrefix("/nocloud.services.")
+      traefik.http.routers.services.entrypoints: grpc
+      traefik.http.services.services.loadbalancer.server.port: 8000
+      traefik.http.services.services.loadbalancer.server.scheme: h2c
     environment:
       LOG_LEVEL: -1
       PORT: 8000
@@ -101,14 +109,16 @@ services:
     links:
       - db
       - billing
+
   sp-registry:
+    container_name: sp-registry
     image: ghcr.io/slntopp/nocloud/sp-registry:latest
     restart: always
     labels:
-      - traefik.http.routers.services_providers.rule=PathPrefix("/nocloud.services_providers.")
-      - traefik.http.routers.services_providers.entrypoints=grpc
-      - traefik.http.services.services_providers.loadbalancer.server.port=8000
-      - traefik.http.services.services_providers.loadbalancer.server.scheme=h2c
+      traefik.http.routers.services_providers.rule: PathPrefix("/nocloud.services_providers.")
+      traefik.http.routers.services_providers.entrypoints: grpc
+      traefik.http.services.services_providers.loadbalancer.server.port: 8000
+      traefik.http.services.services_providers.loadbalancer.server.scheme: h2c
     environment:
       LOG_LEVEL: -1
       PORT: 8000
@@ -128,14 +138,16 @@ services:
       - mq
     links:
       - db
+
   edge:
+    container_name: edge
     image: ghcr.io/slntopp/nocloud/edge:latest
     restart: always
     labels:
-      - traefik.http.routers.edge.rule=PathPrefix("/nocloud.edge.")
-      - traefik.http.routers.edge.entrypoints=grpc
-      - traefik.http.services.edge.loadbalancer.server.port=8000
-      - traefik.http.services.edge.loadbalancer.server.scheme=h2c
+      traefik.http.routers.edge.rule: PathPrefix("/nocloud.edge.")
+      traefik.http.routers.edge.entrypoints: grpc
+      traefik.http.services.edge.loadbalancer.server.port: 8000
+      traefik.http.services.edge.loadbalancer.server.scheme: h2c
     environment:
       LOG_LEVEL: -1
       PORT: 8000
@@ -148,13 +160,14 @@ services:
       - db
 
   dns-mgmt:
+    container_name: dns-mgmt
     image: ghcr.io/slntopp/nocloud/dns-mgmt:latest
     restart: always
     labels:
-      - traefik.http.routers.dns.rule=PathPrefix("/nocloud.dns.")
-      - traefik.http.routers.dns.entrypoints=grpc
-      - traefik.http.services.dns.loadbalancer.server.port=8000
-      - traefik.http.services.dns.loadbalancer.server.scheme=h2c
+      traefik.http.routers.dns.rule: PathPrefix("/nocloud.dns.")
+      traefik.http.routers.dns.entrypoints: grpc
+      traefik.http.services.dns.loadbalancer.server.port: 8000
+      traefik.http.services.dns.loadbalancer.server.scheme: h2c
     networks:
       - proxy
       - grpc-internal
@@ -164,14 +177,16 @@ services:
       PORT: 8000
       SIGNING_KEY: "${SIGNING_KEY}"
       REDIS_HOST: redis_settings:6379
+
   settings:
+    container_name: settings
     image: ghcr.io/slntopp/nocloud/settings:latest
     restart: always
     labels:
-      - traefik.http.routers.settings.rule=PathPrefix("/nocloud.settings.")
-      - traefik.http.routers.settings.entrypoints=grpc
-      - traefik.http.services.settings.loadbalancer.server.port=8000
-      - traefik.http.services.settings.loadbalancer.server.scheme=h2c
+      traefik.http.routers.settings.rule: PathPrefix("/nocloud.settings.")
+      traefik.http.routers.settings.entrypoints: grpc
+      traefik.http.services.settings.loadbalancer.server.port: 8000
+      traefik.http.services.settings.loadbalancer.server.scheme: h2c
     depends_on:
       - redis_settings
     networks:
@@ -183,7 +198,9 @@ services:
       PORT: 8000
       SIGNING_KEY: "${SIGNING_KEY}"
       REDIS_HOST: redis_settings:6379
+
   redis_settings:
+    container_name: redis_settings
     image: redis
     restart: always
     command: redis-server --save 60 1
@@ -193,13 +210,14 @@ services:
       - redis-settings-data:/data
 
   billing:
+    container_name: billing
     image: ghcr.io/slntopp/nocloud/billing:latest
     restart: always
     labels:
-      - traefik.http.routers.billing.rule=PathPrefix("/nocloud.billing.")
-      - traefik.http.routers.billing.entrypoints=grpc
-      - traefik.http.services.billing.loadbalancer.server.port=8000
-      - traefik.http.services.billing.loadbalancer.server.scheme=h2c
+      traefik.http.routers.billing.rule: PathPrefix("/nocloud.billing.")
+      traefik.http.routers.billing.entrypoints: grpc
+      traefik.http.services.billing.loadbalancer.server.port: 8000
+      traefik.http.services.billing.loadbalancer.server.scheme: h2c
     depends_on:
       - db
       - settings
@@ -220,12 +238,13 @@ services:
       - db
 
   db:
+    container_name: db
     image: arangodb/arangodb:latest
     restart: always
     labels:
-      - traefik.http.routers.db.rule=Host(`db.${BASE_DOMAIN}`)
-      - traefik.http.routers.db.entrypoints=http
-      - traefik.http.services.db.loadbalancer.server.port=8529
+      traefik.http.routers.db.rule: Host(`db.${BASE_DOMAIN}`)
+      traefik.http.routers.db.entrypoints: http
+      traefik.http.services.db.loadbalancer.server.port: 8529
     environment:
       ARANGO_ROOT_PASSWORD: "${DB_PASS}"
     volumes:
@@ -235,11 +254,12 @@ services:
       - arangodb
 
   rabbitmq:
+    container_name: rabbitmq
     image: rabbitmq:3.9-management
     labels:
-      - traefik.http.routers.rabbitmq.rule=Host(`rbmq.nocloud.local`)
-      - traefik.http.routers.rabbitmq.entrypoints=http
-      - traefik.http.services.rabbitmq.loadbalancer.server.port=15672
+      traefik.http.routers.rabbitmq.rule: Host(`rbmq.nocloud.local`)
+      traefik.http.routers.rabbitmq.entrypoints: http
+      traefik.http.services.rabbitmq.loadbalancer.server.port: 15672
     networks:
       - mq
       - proxy
@@ -248,7 +268,7 @@ services:
       RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASS}"
 
   driver-ione:
-    container_name: driver
+    container_name: driver-ione
     restart: always
     image: ghcr.io/slntopp/nocloud-driver-ione:latest
     networks:
