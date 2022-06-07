@@ -1,5 +1,14 @@
 version: "3.8"
 services:
+  coredns:
+    restart: always
+    image: coredns/coredns
+    command: -conf coredns-config/Corefile
+    labels:
+      nocloud_op.dns_server: grpc-internal
+    volumes:
+      - ./Corefile:/coredns-config/Corefile
+
   proxy:
     image: traefik:latest
     container_name: proxy

@@ -32,6 +32,7 @@ type Operator struct {
 	client     *dockerClient.Client
 	containers map[string]ContainerInfo
 	config     OperatorConfig
+	DnsIp      string
 }
 
 func NewOperator() *Operator {
@@ -52,6 +53,31 @@ func NewOperator() *Operator {
 	}
 
 	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data}
+}
+
+func (o *Operator) GetDnsIp() {
+	ctx := context.Background()
+	composeConfig := readComposeConfig("docker-compose.yml")
+	networkName, ok := composeConfig.Services["coredns"].Labels["nocloud_op.dns_server"]
+	if !ok {
+		log.Panic("No dns config")
+	}
+
+	filters := dockerFilters.NewArgs()
+	filters.Add("name", "coredns")
+	container, err := o.client.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters,
+	})
+	if err != nil || len(container) != 1 {
+		log.Panic("Something goes wrong")
+	}
+
+	containerInfo, _, err := o.client.ContainerInspectWithRaw(ctx, container[0].ID, false)
+	if err != nil {
+		return
+	}
+
+	o.DnsIp = containerInfo.NetworkSettings.Networks[o.config.ComposePrefix+networkName].IPAddress
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {
@@ -123,13 +149,15 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 		return
 	}
 
-	image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
-	if err != nil {
-		return
-	}
+	if _, ok := container.Config.Labels[EnableLabel]; ok {
+		image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
+		if err != nil {
+			return
+		}
 
-	o.pullImage(ctx, image.RepoTags[0])
-	o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig)
+		o.pullImage(ctx, image.RepoTags[0])
+		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig)
+	}
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
