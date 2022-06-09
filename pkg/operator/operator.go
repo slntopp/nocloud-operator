@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+	"github.com/gorobot-nz/docker-operator/pkg/dns"
 	"gopkg.in/yaml.v3"
 	"io"
 	"io/ioutil"
@@ -32,7 +33,7 @@ type Operator struct {
 	client     *dockerClient.Client
 	containers map[string]ContainerInfo
 	config     OperatorConfig
-	DnsIp      string
+	dnsWrap    *dns.DnsWrap
 }
 
 func NewOperator() *Operator {
@@ -57,27 +58,25 @@ func NewOperator() *Operator {
 
 func (o *Operator) GetDnsIp() {
 	ctx := context.Background()
-	composeConfig := readComposeConfig("docker-compose.yml")
-	networkName, ok := composeConfig.Services["coredns"].Labels["nocloud_op.dns_server"]
-	if !ok {
-		log.Panic("No dns config")
-	}
-
-	filters := dockerFilters.NewArgs()
-	filters.Add("name", "coredns")
-	container, err := o.client.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filters,
-	})
-	if err != nil || len(container) != 1 {
-		log.Panic("Something goes wrong")
-	}
-
-	containerInfo, _, err := o.client.ContainerInspectWithRaw(ctx, container[0].ID, false)
+	containersList, err := o.client.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
 		return
 	}
 
-	o.DnsIp = containerInfo.NetworkSettings.Networks[o.config.ComposePrefix+networkName].IPAddress
+	for _, container := range containersList {
+		_, serverLabelOk := container.Labels[dns.ServerLabel]
+		networkLabel, networkLabelOk := container.Labels[dns.NetworkLabel]
+
+		if serverLabelOk && networkLabelOk {
+			containerInfo, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
+			if err != nil {
+				return
+			}
+			networkConfig := containerInfo.NetworkSettings.Networks[o.config.ComposePrefix+networkLabel]
+			o.dnsWrap = dns.NewDnsWrap(networkLabel, networkConfig.IPAddress)
+			return
+		}
+	}
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {
@@ -149,7 +148,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 		return
 	}
 
-	if _, ok := container.Config.Labels[EnableLabel]; ok {
+	if _, ok := container.Config.Labels[dns.UpdateLabel]; ok {
 		image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
 		if err != nil {
 			return
