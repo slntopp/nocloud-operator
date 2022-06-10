@@ -42,7 +42,7 @@ func NewOperator() *Operator {
 		log.Fatal(err)
 	}
 
-	bytes, err := ioutil.ReadFile("operator-config.json")
+	bytes, err := ioutil.ReadFile("operator-config.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}
