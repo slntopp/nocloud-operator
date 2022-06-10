@@ -107,12 +107,8 @@ func (o *Operator) ObserveContainers() {
 				go o.processEvent(ctx, event, &mutex)
 			}
 		case <-ticker.C:
-			list, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
-			if err != nil {
-				return
-			}
-			for _, container := range list {
-				go o.checkHash(ctx, container.ID)
+			for _, container := range o.containers {
+				go o.checkHash(ctx, container.Id)
 			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
@@ -278,6 +274,12 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 
 func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig) error {
 	containerConfig, networksNames, containerName, endpointsConfig := o.getContainerComposeConfig(imageName)
+
+	if _, ok := containerConfig.Labels[dns.DnsRequiredLabel]; ok {
+		hostCfg.DNS = []string{o.dnsWrap.DnsIp}
+		hostCfg.DNSSearch = []string{}
+		hostCfg.DNSOptions = []string{}
+	}
 
 	create, err := o.client.ContainerCreate(ctx, containerConfig, hostCfg, nil, nil, containerName)
 	if err != nil {

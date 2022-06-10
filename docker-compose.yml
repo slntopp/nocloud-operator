@@ -177,6 +177,7 @@ services:
       traefik.http.routers.dns.entrypoints: grpc
       traefik.http.services.dns.loadbalancer.server.port: 8000
       traefik.http.services.dns.loadbalancer.server.scheme: h2c
+      nocloud.dns.api: as
     networks:
       - proxy
       - grpc-internal

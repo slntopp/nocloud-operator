@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	dockerOperator "github.com/gorobot-nz/docker-operator/pkg/operator"
 
 	"github.com/joho/godotenv"
@@ -16,12 +15,11 @@ func main() {
 
 	operator := dockerOperator.NewOperator()
 	operator.GetDnsIp()
-	fmt.Println(operator.DnsIp)
 
-	/*containers := operator.Ps()
+	containers := operator.Ps()
 	for _, container := range containers {
 		log.Println(container)
 	}
 
-	operator.ObserveContainers()*/
+	operator.ObserveContainers()
 }

@@ -1,0 +1,270 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pkg/dns/proto/dns.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "DNS"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/dns": {
+      "get": {
+        "operationId": "DNS_List",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/dnsListResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "DNS"
+        ]
+      },
+      "put": {
+        "operationId": "DNS_Put",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/dnsResult"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/dnsZone"
+            }
+          }
+        ],
+        "tags": [
+          "DNS"
+        ]
+      }
+    },
+    "/dns/{name}": {
+      "get": {
+        "operationId": "DNS_Get",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/dnsZone"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "DNS"
+        ]
+      },
+      "delete": {
+        "operationId": "DNS_Delete",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/dnsResult"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "DNS"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "RecordA": {
+      "type": "object",
+      "properties": {
+        "ip": {
+          "type": "string"
+        },
+        "ttl": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "RecordAAAA": {
+      "type": "object",
+      "properties": {
+        "ip": {
+          "type": "string"
+        },
+        "ttl": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "RecordCNAME": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "ttl": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "RecordTXT": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "ttl": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "dnsListResponse": {
+      "type": "object",
+      "properties": {
+        "zones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dnsRecord": {
+      "type": "object",
+      "properties": {
+        "a": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RecordA"
+          }
+        },
+        "aaaa": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RecordAAAA"
+          }
+        },
+        "cname": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RecordCNAME"
+          }
+        },
+        "txt": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RecordTXT"
+          }
+        }
+      }
+    },
+    "dnsResult": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "dnsZone": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "locations": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/dnsRecord"
+          }
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}
