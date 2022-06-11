@@ -21,4 +21,4 @@ pull_health:
 
 
 pull_service_registry:
-	docker rmi ghcr.io/slntopp/nocloud/services-registry:latest && docker pull ghcr.io/slntopp/nocloud/services-registry:dev-billing-plans && docker tag ghcr.io/slntopp/nocloud/services-registry:dev-billing-plans ghcr.io/slntopp/nocloud/services-registry:latest && docker rm ghcr.io/slntopp/nocloud/services-registry:dev-billing-plans
+	docker rmi ghcr.io/slntopp/nocloud/services-registry:latest && docker pull ghcr.io/slntopp/nocloud/services-registry:dev-billing-plans && docker tag ghcr.io/slntopp/nocloud/services-registry:dev-billing-plans ghcr.io/slntopp/nocloud/services-registry:latest && docker rmi ghcr.io/slntopp/nocloud/services-registry:dev-billing-plans

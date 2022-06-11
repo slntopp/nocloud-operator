@@ -2,7 +2,6 @@ package operator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
@@ -48,7 +47,7 @@ func NewOperator() *Operator {
 	}
 
 	var data OperatorConfig
-	err = json.Unmarshal(bytes, &data)
+	err = yaml.Unmarshal(bytes, &data)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -119,7 +118,7 @@ func (o *Operator) ObserveContainers() {
 			}
 		case <-ticker.C:
 			for _, container := range o.containers {
-				go o.checkHash(ctx, container.Id)
+				go o.CheckHash(ctx, container.Id)
 			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
@@ -149,11 +148,13 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex
 	return
 }
 
-func (o *Operator) checkHash(ctx context.Context, containerId string) {
+func (o *Operator) CheckHash(ctx context.Context, containerId string) {
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
 		return
 	}
+
+	endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks)
 
 	if _, ok := container.Config.Labels[dns.UpdateLabel]; ok {
 		image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
@@ -162,7 +163,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 		}
 
 		o.pullImage(ctx, image.RepoTags[0])
-		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig)
+		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig, endpointsConfig)
 	}
 }
 
@@ -186,7 +187,7 @@ func (o *Operator) pullImage(ctx context.Context, imageName string) {
 	}
 }
 
-func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, hostCfg *dockerContainer.HostConfig) {
+func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, hostCfg *dockerContainer.HostConfig, e *EndpointsConfig) {
 	image := o.getImage(ctx, imageName)
 	if image.ID == imageId {
 		log.Println("Container is up to date")
@@ -198,7 +199,7 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 		log.Fatalf(err.Error())
 	}
 
-	err = o.createNewContainer(ctx, imageName, hostCfg)
+	err = o.createNewContainer(ctx, imageName, hostCfg, e)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -227,7 +228,7 @@ func (o *Operator) getContainer(ctx context.Context, containerId string) types.C
 	return containers[0]
 }
 
-func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}, string, *EndpointsConfig) {
+func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}, string) {
 	composeConfig := readComposeConfig("docker-compose.yml")
 
 	for _, serviceConfig := range composeConfig.Services {
@@ -255,13 +256,10 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			}
 			containerConfig.Labels = getEnvValues(serviceConfig.Labels)
 
-			var endpointsConfig EndpointsConfig
-			endpointsConfig.Links = serviceConfig.Links
-			endpointsConfig.Aliases = []string{serviceConfig.ContainerName}
-			return containerConfig, &networks, serviceConfig.ContainerName, &endpointsConfig
+			return containerConfig, &networks, serviceConfig.ContainerName
 		}
 	}
-	return nil, nil, "", nil
+	return nil, nil, ""
 }
 
 func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, imageId string) error {
@@ -283,8 +281,8 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 	return nil
 }
 
-func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig) error {
-	containerConfig, networksNames, containerName, endpointsConfig := o.getContainerComposeConfig(imageName)
+func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig, e *EndpointsConfig) error {
+	containerConfig, networksNames, containerName := o.getContainerComposeConfig(imageName)
 
 	if _, ok := containerConfig.Labels[dns.DnsRequiredLabel]; ok {
 		hostCfg.DNS = []string{o.dnsWrap.DnsIp}
@@ -301,7 +299,7 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 		return err
 	}
 
-	err = o.connectNetworks(ctx, create.ID, networksNames, endpointsConfig)
+	err = o.connectNetworks(ctx, create.ID, networksNames, e)
 	if err != nil {
 		return err
 	}
@@ -430,4 +428,14 @@ func getEnvValue(value string) string {
 	}
 
 	return string(result)
+}
+
+func getLinksAndAliases(networks map[string]*network.EndpointSettings) *EndpointsConfig {
+	for _, value := range networks {
+		return &EndpointsConfig{
+			Links:   value.Links,
+			Aliases: value.Aliases[:len(value.Aliases)-1],
+		}
+	}
+	return nil
 }

@@ -1,2 +1,3 @@
-"duration": 30
-"composePrefix": "docker-operator_"
+duration: 30
+composePrefix: "docker-operator_"
+
