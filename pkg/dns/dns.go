@@ -14,7 +14,7 @@ type DnsWrap struct {
 
 const Port = "8080"
 
-func NewDnsWrap(network string, dnsIp string) *DnsWrap {
+func NewDnsWrap(network string, dnsIp string, dnsMgmtIp string) *DnsWrap {
 	host := dnsIp + ":" + Port
 	conn, err := grpc.Dial(host, grpc.WithBlock())
 	if err != nil {

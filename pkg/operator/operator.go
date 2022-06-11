@@ -63,16 +63,27 @@ func (o *Operator) ConfigureDns() error {
 		return err
 	}
 
-	for _, container := range containersList {
-		_, serverLabelOk := container.Labels[dns.ServerLabel]
-		networkLabel, networkLabelOk := container.Labels[dns.NetworkLabel]
+	dnsCheck, dnsMgmtCheck := false, false
+	dnsIp, dnsMgmtIp, dnsNetworkName := "", "", ""
 
-		if serverLabelOk && networkLabelOk {
-			ipAddress, err := o.getIpInNetwork(ctx, container.ID, networkLabel)
+	for _, container := range containersList {
+		if _, serverLabelOk := container.Labels[dns.ServerLabel]; serverLabelOk {
+			dnsIp, err = o.getIpInNetwork(ctx, container.ID, container.Labels[dns.NetworkLabel])
 			if err != nil {
 				return err
 			}
-			o.dnsWrap = dns.NewDnsWrap(networkLabel, ipAddress)
+			dnsNetworkName = container.Labels[dns.NetworkLabel]
+			dnsCheck = true
+		} else if _, apiLabelOk := container.Labels[dns.ApiLabel]; apiLabelOk {
+			dnsMgmtIp, err = o.getIpInNetwork(ctx, container.ID, container.Labels[dns.NetworkLabel])
+			if err != nil {
+				return err
+			}
+			dnsMgmtCheck = true
+		}
+
+		if dnsCheck && dnsMgmtCheck {
+			o.dnsWrap = dns.NewDnsWrap(dnsNetworkName, dnsIp, dnsMgmtIp)
 			return nil
 		}
 	}
