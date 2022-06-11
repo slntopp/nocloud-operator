@@ -341,7 +341,34 @@ func (o *Operator) connectNetworks(ctx context.Context, containerId string, endp
 		})
 	}
 
+	o.configureDnsMgmtRecords(ctx, containerId)
+
 	return nil
+}
+
+func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
+	container, _, err := o.client.ContainerInspectWithRaw(ctx, id, false)
+	if err != nil {
+		return
+	}
+	labels := container.Config.Labels
+	if zoneLabelValue, ok := labels[dns.ZoneLabel]; ok {
+		ip, err := o.getIpInNetwork(ctx, id, labels[dns.NetworkLabel])
+		if err != nil {
+			return
+		}
+		locations := make(map[string]string)
+		for key, value := range labels {
+			if strings.HasPrefix(key, dns.KeyLabel) {
+				splitedKey := strings.Split(key, ".")
+				locations[value] = splitedKey[len(splitedKey)-1]
+			}
+		}
+		err = o.dnsWrap.Get(ctx, zoneLabelValue, ip, locations)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+	}
 }
 
 func readComposeConfig(path string) Config {

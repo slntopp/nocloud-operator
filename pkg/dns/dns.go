@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"github.com/gorobot-nz/docker-operator/pkg/dns/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -12,10 +13,10 @@ type DnsWrap struct {
 	DnsClient proto.DNSClient
 }
 
-const Port = "8080"
+const port = "8080"
 
 func NewDnsWrap(network string, dnsIp string, dnsMgmtIp string) *DnsWrap {
-	host := dnsIp + ":" + Port
+	host := dnsMgmtIp + ":" + port
 	conn, err := grpc.Dial(host, grpc.WithBlock())
 	if err != nil {
 		log.Fatal("Something bad with dns client")
@@ -23,4 +24,42 @@ func NewDnsWrap(network string, dnsIp string, dnsMgmtIp string) *DnsWrap {
 
 	dnsClient := proto.NewDNSClient(conn)
 	return &DnsWrap{Network: network, DnsIp: dnsIp, DnsClient: dnsClient}
+}
+
+func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, locations map[string]string) error {
+	zone := proto.Zone{Name: zoneName}
+	get, err := d.DnsClient.Get(ctx, &zone)
+	if err != nil {
+		return err
+	}
+
+	locs := get.Locations
+
+	for key, value := range locations {
+		records := locs[key]
+
+		switch value {
+		case "a":
+			records.A = append(records.A, &proto.Record_A{Ip: ip})
+		case "aaaa":
+			records.Aaaa = append(records.Aaaa, &proto.Record_AAAA{Ip: ip})
+		case "cname":
+			records.Cname = append(records.Cname, &proto.Record_CNAME{Host: ip})
+		case "txt":
+			records.Txt = append(records.Txt, &proto.Record_TXT{Text: ip})
+		}
+
+		locs[key] = records
+	}
+
+	get.Locations = locs
+
+	put, err := d.DnsClient.Put(ctx, get)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("From dns log %d", put.Result)
+
+	return nil
 }

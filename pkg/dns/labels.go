@@ -7,8 +7,9 @@ const (
 	NetworkLabel     = "nocloud.dns.network"
 	DnsRequiredLabel = "nocloud.dns.required"
 	ZoneLabel        = "nocloud.dns.zone"
-	ALabel           = "nocloud.dns.a"
-	AAAALabel        = "nocloud.dns.aaaa"
-	CNameLabel       = "nocloud.dns.cname"
-	TxtLabel         = "nocloud.dns.txt"
+	KeyLabel         = "nocloud.dns.key"
+	ALabel           = "nocloud.dns.key.a"
+	AAAALabel        = "nocloud.dns.key.aaaa"
+	CNameLabel       = "nocloud.dns.key.cname"
+	TxtLabel         = "nocloud.dns.key.txt"
 )
