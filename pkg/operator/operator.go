@@ -56,11 +56,11 @@ func NewOperator() *Operator {
 	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data}
 }
 
-func (o *Operator) GetDnsIp() {
+func (o *Operator) ConfigureDns() error {
 	ctx := context.Background()
 	containersList, err := o.client.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
-		return
+		return err
 	}
 
 	for _, container := range containersList {
@@ -68,15 +68,15 @@ func (o *Operator) GetDnsIp() {
 		networkLabel, networkLabelOk := container.Labels[dns.NetworkLabel]
 
 		if serverLabelOk && networkLabelOk {
-			containerInfo, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
+			ipAddress, err := o.getIpInNetwork(ctx, container.ID, networkLabel)
 			if err != nil {
-				return
+				return err
 			}
-			networkConfig := containerInfo.NetworkSettings.Networks[o.config.ComposePrefix+networkLabel]
-			o.dnsWrap = dns.NewDnsWrap(networkLabel, networkConfig.IPAddress)
-			return
+			o.dnsWrap = dns.NewDnsWrap(networkLabel, ipAddress)
+			return nil
 		}
 	}
+	return nil
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {
@@ -296,6 +296,15 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	}
 
 	return nil
+}
+
+func (o *Operator) getIpInNetwork(ctx context.Context, containerId string, networkName string) (string, error) {
+	containerInfo, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
+	if err != nil {
+		return "", err
+	}
+
+	return containerInfo.NetworkSettings.Networks[o.config.ComposePrefix+networkName].IPAddress, nil
 }
 
 func (o *Operator) connectNetworks(ctx context.Context, containerId string, endpointsNames *map[string]struct{}, config *EndpointsConfig) error {

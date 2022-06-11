@@ -12,8 +12,10 @@ type DnsWrap struct {
 	DnsClient proto.DNSClient
 }
 
+const Port = "8080"
+
 func NewDnsWrap(network string, dnsIp string) *DnsWrap {
-	host := "127.0.0.1:8080"
+	host := dnsIp + ":" + Port
 	conn, err := grpc.Dial(host, grpc.WithBlock())
 	if err != nil {
 		log.Fatal("Something bad with dns client")

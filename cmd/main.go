@@ -14,7 +14,10 @@ func main() {
 	}
 
 	operator := dockerOperator.NewOperator()
-	operator.GetDnsIp()
+	err = operator.ConfigureDns()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
 	containers := operator.Ps()
 	for _, container := range containers {
