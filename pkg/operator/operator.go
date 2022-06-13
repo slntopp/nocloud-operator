@@ -118,7 +118,7 @@ func (o *Operator) ObserveContainers() {
 			}
 		case <-ticker.C:
 			for _, container := range o.containers {
-				go o.CheckHash(ctx, container.Id)
+				go o.checkHash(ctx, container.Id)
 			}
 		case err := <-errorsChan:
 			fmt.Println(err.Error())
@@ -148,7 +148,7 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex
 	return
 }
 
-func (o *Operator) CheckHash(ctx context.Context, containerId string) {
+func (o *Operator) checkHash(ctx context.Context, containerId string) {
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
 		return
