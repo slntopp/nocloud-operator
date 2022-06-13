@@ -1,5 +1,7 @@
 # Nocloud-operator
+
 ___
+
 ### Nocloud-operator - util for updating container and images
 
 To get start you need __operator-config.yaml__ file
@@ -11,3 +13,5 @@ composePrefix: "docker-operator_"
 __Duration__ - the amount of time in __minutes__ after which the operator will start the update
 
 __ComposePrefix__ - name of project where you start you containers 
+
+You also need to have __.env__ and __docker-compose.yml__ files from your project
