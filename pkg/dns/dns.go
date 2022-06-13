@@ -2,8 +2,8 @@ package dns
 
 import (
 	"context"
-	"github.com/gorobot-nz/docker-operator/pkg/dns/proto"
 	log "github.com/sirupsen/logrus"
+	"github.com/slntopp/nocloud/pkg/dns/proto"
 	"google.golang.org/grpc"
 )
 

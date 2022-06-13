@@ -155,6 +155,7 @@ func (o *Operator) CheckHash(ctx context.Context, containerId string) {
 	}
 
 	endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks)
+	labels := container.Config.Labels
 
 	if _, ok := container.Config.Labels[dns.UpdateLabel]; ok {
 		image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
@@ -163,7 +164,7 @@ func (o *Operator) CheckHash(ctx context.Context, containerId string) {
 		}
 
 		o.pullImage(ctx, image.RepoTags[0])
-		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig, endpointsConfig)
+		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig, labels, endpointsConfig)
 	}
 }
 
@@ -187,19 +188,20 @@ func (o *Operator) pullImage(ctx context.Context, imageName string) {
 	}
 }
 
-func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, hostCfg *dockerContainer.HostConfig, e *EndpointsConfig) {
+func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, hostCfg *dockerContainer.HostConfig, labels map[string]string, endpointsCfg *EndpointsConfig) {
 	image := o.getImage(ctx, imageName)
 	if image.ID == imageId {
 		log.Println("Container is up to date")
 		return
 	}
+	labels["com.docker.compose.image"] = image.ID
 
 	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	err = o.createNewContainer(ctx, imageName, hostCfg, e)
+	err = o.createNewContainer(ctx, imageName, hostCfg, &labels, endpointsCfg)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -254,7 +256,6 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			for _, value := range serviceConfig.Networks {
 				networks[o.config.ComposePrefix+value] = struct{}{}
 			}
-			containerConfig.Labels = getEnvValues(serviceConfig.Labels)
 
 			return containerConfig, &networks, serviceConfig.ContainerName
 		}
@@ -281,8 +282,9 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 	return nil
 }
 
-func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig, e *EndpointsConfig) error {
+func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig, labels *map[string]string, e *EndpointsConfig) error {
 	containerConfig, networksNames, containerName := o.getContainerComposeConfig(imageName)
+	containerConfig.Labels = *labels
 
 	if _, ok := containerConfig.Labels[dns.DnsRequiredLabel]; ok {
 		hostCfg.DNS = []string{o.dnsWrap.DnsIp}
