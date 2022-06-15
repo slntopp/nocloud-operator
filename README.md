@@ -14,8 +14,6 @@ __Duration__ - the amount of time in __seconds__ after which the operator will s
 
 __ComposePrefix__ - name of project where you start you containers 
 
-You also need to have __.env__ and __docker-compose.yml__ files from your project
-
 ### Example of docker-compose file for operator
 
 ```yaml
