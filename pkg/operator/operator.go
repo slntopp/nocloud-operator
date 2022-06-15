@@ -163,6 +163,11 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 			return
 		}
 
+		if len(image.RepoTags) == 0 {
+			log.Error("Something wrong with tags of your image")
+			return
+		}
+
 		o.pullImage(ctx, image.RepoTags[0])
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig, labels, endpointsConfig)
 	}
@@ -172,6 +177,7 @@ func (o *Operator) pullImage(ctx context.Context, imageName string) {
 	out, err := o.client.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
 		log.Errorf("Pull error: %s", err.Error())
+		return
 	}
 
 	defer func(out io.ReadCloser) {

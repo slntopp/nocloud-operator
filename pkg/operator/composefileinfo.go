@@ -24,7 +24,7 @@ type Service struct {
 	Restart       string            `yaml:"restart"`
 	Image         string            `yaml:"image"`
 	Links         []string          `yaml:"links"`
-	Labels        map[string]string `yaml:"labels"`
+	Labels        []string          `yaml:"labels"`
 	Volumes       []string          `yaml:"volumes"`
 	Ports         []string          `yaml:"ports"`
 	Environment   map[string]string `yaml:"environment"`
