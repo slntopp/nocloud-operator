@@ -171,19 +171,19 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
 	out, err := o.client.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
-		panic(err)
+		log.Errorf("Pull error: %s", err.Error())
 	}
 
 	defer func(out io.ReadCloser) {
 		err := out.Close()
 		if err != nil {
-			log.Fatal("Somethings wrong")
+			log.Error("Somethings wrong while closing contaner pull err")
 		}
 	}(out)
 
 	_, err = io.Copy(os.Stdout, out)
 	if err != nil {
-		log.Fatal("Wrong stream")
+		log.Error("Wrong stream")
 		return
 	}
 }
@@ -198,12 +198,12 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 
 	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Errorf("While deleting old image and container: %s", err.Error())
 	}
 
 	err = o.createNewContainer(ctx, imageName, hostCfg, &labels, endpointsCfg)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Errorf("While creating new container: %s", err.Error())
 	}
 }
 
@@ -212,7 +212,7 @@ func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSu
 	filters.Add("reference", imageName)
 	images, err := o.client.ImageList(ctx, types.ImageListOptions{Filters: filters})
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("While getting image: %s", err.Error())
 	}
 	return images[0]
 }
@@ -225,7 +225,7 @@ func (o *Operator) getContainer(ctx context.Context, containerId string) types.C
 		Filters: filters,
 	})
 	if err != nil {
-		log.Fatal("Error")
+		log.Errorf("While getting container: %s", err.Error())
 	}
 	return containers[0]
 }
@@ -357,7 +357,7 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 		aValue := labels[dns.ALabel]
 		err = o.dnsWrap.Get(ctx, zoneLabelValue, ip, aValue)
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Errorf("Dns error: %s", err.Error())
 		}
 	}
 }
@@ -365,13 +365,13 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 func readComposeConfig(path string) Config {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("No compose file: %s", err.Error())
 	}
 
 	var data Config
 	err = yaml.Unmarshal(bytes, &data)
 	if err != nil {
-		log.Fatal(err)
+		log.Errorf("Unmarshal error: %s", err.Error())
 	}
 	return data
 }
