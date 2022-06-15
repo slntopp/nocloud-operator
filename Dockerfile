@@ -11,7 +11,6 @@ ENV PROJECT_REPO=github.com/slntopp/nocloud-operator
 ENV APP_PATH=/go/src/${PROJECT_REPO}
 WORKDIR ${APP_PATH}
 COPY --from=0 ${APP_PATH}/operator ${APP_PATH}/operator
-COPY --from=0 ${APP_PATH}/operator-config.yaml ${APP_PATH}/operator-config.yaml
 COPY --from=0 ${APP_PATH}/.env ${APP_PATH}/.env
 
 ENTRYPOINT ["./operator"]

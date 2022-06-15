@@ -1,10 +1,9 @@
 package main
 
 import (
-	dockerOperator "github.com/slntopp/nocloud-operator/pkg/operator"
-
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
+	dockerOperator "github.com/slntopp/nocloud-operator/pkg/operator"
 )
 
 func main() {

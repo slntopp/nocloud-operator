@@ -41,7 +41,7 @@ func NewOperator() *Operator {
 		log.Fatal(err)
 	}
 
-	bytes, err := ioutil.ReadFile("operator-config.yaml")
+	bytes, err := ioutil.ReadFile("operator-config.yml")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,6 +117,7 @@ func (o *Operator) ObserveContainers() {
 				go o.processEvent(ctx, event, &mutex)
 			}
 		case <-ticker.C:
+			log.Infof("Log after %d seconds", o.config.Duration)
 			for _, container := range o.containers {
 				go o.checkHash(ctx, container.Id)
 			}
