@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
-	"github.com/gorobot-nz/docker-operator/pkg/dns"
+	"github.com/slntopp/nocloud-operator/pkg/dns"
 	"gopkg.in/yaml.v3"
 	"io"
 	"io/ioutil"
@@ -154,7 +154,6 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 		return
 	}
 
-	endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks)
 	labels := container.Config.Labels
 
 	if _, ok := container.Config.Labels[dns.UpdateLabel]; ok {
@@ -168,6 +167,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 			return
 		}
 
+		endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks)
 		o.pullImage(ctx, image.RepoTags[0])
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.HostConfig, labels, endpointsConfig)
 	}
@@ -431,9 +431,16 @@ func getEnvValue(value string) string {
 
 func getLinksAndAliases(networks map[string]*network.EndpointSettings) *EndpointsConfig {
 	for _, value := range networks {
+		var links = value.Links
+		var aliases = value.Aliases
+
+		if len(aliases) != 0 {
+			aliases = aliases[:len(aliases)-1]
+		}
+
 		return &EndpointsConfig{
-			Links:   value.Links,
-			Aliases: value.Aliases[:len(value.Aliases)-1],
+			Links:   links,
+			Aliases: aliases,
 		}
 	}
 	return nil

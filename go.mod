@@ -1,4 +1,4 @@
-module github.com/gorobot-nz/docker-operator
+module github.com/slntopp/nocloud-operator
 
 go 1.18
 

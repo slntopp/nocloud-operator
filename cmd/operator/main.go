@@ -1,7 +1,7 @@
 package main
 
 import (
-	dockerOperator "github.com/gorobot-nz/docker-operator/pkg/operator"
+	dockerOperator "github.com/slntopp/nocloud-operator/pkg/operator"
 
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
