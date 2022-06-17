@@ -20,8 +20,8 @@ __ComposePrefix__ - name of project where you start you containers
 version: "3.8"
 services:
   operator:
-    environment:
-      - all env variables used in your project
+    env_file:
+      - .env
     container_name: operator
     image: operator:latest
     restart: always
