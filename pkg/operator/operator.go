@@ -98,6 +98,7 @@ func (o *Operator) Ps() map[string]ContainerInfo {
 
 	for _, container := range containers {
 		o.containers[container.ID] = *NewContainerInfo(&container)
+		go o.configureDnsMgmtRecords(ctx, container.ID)
 	}
 	return o.containers
 }
