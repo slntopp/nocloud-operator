@@ -26,7 +26,7 @@ services:
     image: operator:latest
     restart: always
     volumes:
-      - ./operator-config.yml:/go/src/github.com/slntopp/nocloud-operator/operator-config.yml
-      - ./docker-compose.yml:/go/src/github.com/slntopp/nocloud-operator/docker-compose.yml
+      - ./operator-config.yml:/operator-config.yml
+      - ./docker-compose.yml:/docker-compose.yml
       - /var/run/docker.sock:/var/run/docker.sock
 ```
