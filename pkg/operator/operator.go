@@ -170,7 +170,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 			return
 		}
 
-		endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks)
+		endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks, container.ID)
 		o.pullImage(ctx, image.RepoTags[0])
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.Name, container.HostConfig, labels, endpointsConfig)
 	}
@@ -432,13 +432,19 @@ func getEnvValue(value string) string {
 	return string(result)
 }
 
-func getLinksAndAliases(networks map[string]*network.EndpointSettings) *EndpointsConfig {
+func getLinksAndAliases(networks map[string]*network.EndpointSettings, id string) *EndpointsConfig {
 	for _, value := range networks {
 		var links = value.Links
 		var aliases = value.Aliases
 
 		if len(aliases) != 0 {
-			aliases = aliases[:len(aliases)-1]
+			var indexOfOldAlias int
+			for i, value := range aliases {
+				if strings.HasPrefix(id, value){
+					indexOfOldAlias = i
+				}
+				aliases = append(aliases[:indexOfOldAlias], aliases[indexOfOldAlias +1 :]...)
+			}
 		}
 
 		return &EndpointsConfig{
