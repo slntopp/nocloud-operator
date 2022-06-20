@@ -1,4 +1,5 @@
-FROM golang:latest
+FROM golang:1.18-alpine
+
 ENV PROJECT_REPO=github.com/slntopp/nocloud-operator
 ENV APP_PATH=/go/src/${PROJECT_REPO}
 WORKDIR ${APP_PATH}
