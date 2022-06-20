@@ -13,4 +13,6 @@ WORKDIR .
 COPY --from=0 ${APP_PATH}/operator ./operator
 COPY --from=0 ${APP_PATH}/.env ./.env
 
+LABEL org.opencontainers.image.source https://github.com/slntopp/nocloud-operator
+
 ENTRYPOINT ["./operator"]

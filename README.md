@@ -24,7 +24,7 @@ services:
     env_file:
       - .env
     container_name: operator
-    image: ghcr.io/slntopp/nocloud-operator:latest
+    image: ghcr.io/slntopp/nocloud/operator:latest
     restart: always
     volumes:
       - ./operator-config.yml:/operator-config.yml
