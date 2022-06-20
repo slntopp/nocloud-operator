@@ -438,12 +438,11 @@ func getLinksAndAliases(networks map[string]*network.EndpointSettings, id string
 		var aliases = value.Aliases
 
 		if len(aliases) != 0 {
-			var indexOfOldAlias int
 			for i, value := range aliases {
 				if strings.HasPrefix(id, value){
-					indexOfOldAlias = i
+					aliases = append(aliases[:i], aliases[i +1 :]...)
+					break
 				}
-				aliases = append(aliases[:indexOfOldAlias], aliases[indexOfOldAlias +1 :]...)
 			}
 		}
 
