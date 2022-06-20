@@ -3,16 +3,22 @@ package operator
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
-	"github.com/slntopp/nocloud-operator/pkg/dns"
-	"gopkg.in/yaml.v3"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
+	"github.com/slntopp/nocloud-operator/pkg/dns"
+	"gopkg.in/yaml.v3"
+
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
+	"github.com/slntopp/nocloud-operator/pkg/dns"
+	"gopkg.in/yaml.v3"
 
 	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"

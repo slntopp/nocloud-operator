@@ -2,6 +2,7 @@ package operator
 
 import (
 	"fmt"
+
 	"github.com/docker/docker/api/types"
 )
 

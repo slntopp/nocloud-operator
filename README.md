@@ -10,9 +10,10 @@ To get start you need __operator-config.yaml__ file
 duration: 30
 composePrefix: "docker-operator_"
 ```
+
 __Duration__ - the amount of time in __seconds__ after which the operator will start the update
 
-__ComposePrefix__ - name of project where you start you containers 
+__ComposePrefix__ - name of project where you start you containers
 
 ### Example of docker-compose file for operator
 
@@ -23,7 +24,7 @@ services:
     env_file:
       - .env
     container_name: operator
-    image: operator:latest
+    image: ghcr.io/slntopp/nocloud-operator:latest
     restart: always
     volumes:
       - ./operator-config.yml:/operator-config.yml

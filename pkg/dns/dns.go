@@ -2,10 +2,11 @@ package dns
 
 import (
 	"context"
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/slntopp/nocloud/pkg/dns/proto"
 	"google.golang.org/grpc"
-	"time"
 )
 
 type DnsWrap struct {
