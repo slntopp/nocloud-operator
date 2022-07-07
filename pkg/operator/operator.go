@@ -181,7 +181,10 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 		}
 
 		endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks, container.ID)
+		log.Info("Pulling image", zap.String("tag", image.RepoTags[0]))
 		o.pullImage(ctx, image.RepoTags[0])
+
+		log.Info("Updating image and Container", zap.String("tag", image.RepoTags[0]), zap.String("container", container.Name))
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.Name, container.HostConfig, labels, endpointsConfig)
 	}
 }
