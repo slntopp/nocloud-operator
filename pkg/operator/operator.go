@@ -56,7 +56,7 @@ func NewOperator(logger *zap.Logger) *Operator {
 		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
-	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data}
+	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log}
 }
 
 func (o *Operator) ConfigureDns() error {
