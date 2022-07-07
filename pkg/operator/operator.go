@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/slntopp/nocloud-operator/pkg/dns"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
 	"github.com/docker/docker/api/types"
@@ -20,7 +21,6 @@ import (
 	"github.com/docker/docker/api/types/events"
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -34,29 +34,33 @@ type Operator struct {
 	containers map[string]ContainerInfo
 	config     OperatorConfig
 	dnsWrap    *dns.DnsWrap
+
+	log *zap.Logger
 }
 
-func NewOperator() *Operator {
+func NewOperator(logger *zap.Logger) *Operator {
+	log := logger.Named("Operator")
 	cli, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv, dockerClient.WithAPIVersionNegotiation())
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed creating Client", zap.Error(err))
 	}
 
 	bytes, err := ioutil.ReadFile("operator-config.yml")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed reading operator config", zap.Error(err))
 	}
 
 	var data OperatorConfig
 	err = yaml.Unmarshal(bytes, &data)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
 	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data}
 }
 
 func (o *Operator) ConfigureDns() error {
+	log := o.log.Named("configure_dns")
 	ctx := context.Background()
 	containersList, err := o.client.NetworkList(ctx, types.NetworkListOptions{})
 	if err != nil {
@@ -83,7 +87,7 @@ func (o *Operator) ConfigureDns() error {
 		}
 
 		if dnsCheck && dnsMgmtCheck {
-			o.dnsWrap = dns.NewDnsWrap(dnsNetworkName, dnsIp, dnsMgmtIp)
+			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp, dnsMgmtIp)
 			return nil
 		}
 	}
@@ -91,10 +95,11 @@ func (o *Operator) ConfigureDns() error {
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {
+	log := o.log.Named("ps")
 	ctx := context.Background()
 	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error listing Containers", zap.Error(err))
 	}
 
 	for _, container := range containers {
@@ -105,6 +110,8 @@ func (o *Operator) Ps() map[string]ContainerInfo {
 }
 
 func (o *Operator) ObserveContainers() {
+	log := o.log.Named("Observer")
+
 	var mutex sync.Mutex
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
@@ -119,12 +126,12 @@ func (o *Operator) ObserveContainers() {
 				go o.processEvent(ctx, event, &mutex)
 			}
 		case <-ticker.C:
-			log.Infof("Log after %d seconds", o.config.Duration)
+			log.Info("Log after", zap.Int("seconds", o.config.Duration))
 			for _, container := range o.containers {
 				go o.checkHash(ctx, container.Id)
 			}
 		case err := <-errorsChan:
-			fmt.Println(err.Error())
+			log.Error("Error in channel", zap.Error(err))
 		default:
 			continue
 		}
@@ -132,9 +139,11 @@ func (o *Operator) ObserveContainers() {
 }
 
 func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex *sync.Mutex) {
+	log := o.log.Named("process_event")
+
 	if event.Action == ActionStop {
 		names := o.containers[event.ID].Names
-		log.Printf("Container stopped ID: %s Names:%v", event.ID, names)
+		log.Info("Container stopped", zap.String("id", event.ID), zap.Strings("names", names))
 		mutex.Lock()
 		delete(o.containers, event.ID)
 		mutex.Unlock()
@@ -143,15 +152,16 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex
 
 	container := o.getContainer(ctx, event.ID)
 	containerInfo := NewContainerInfo(&container)
+
 	mutex.Lock()
 	o.containers[containerInfo.Id] = *containerInfo
 	mutex.Unlock()
-	log.Println("Container started")
-	log.Println(containerInfo)
-	return
+
+	log.Info("Container started", zap.Any("info", containerInfo))
 }
 
 func (o *Operator) checkHash(ctx context.Context, containerId string) {
+	log := o.log.Named("check_hash")
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
 		return
@@ -166,7 +176,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 		}
 
 		if len(image.RepoTags) == 0 {
-			log.Error("Something wrong with tags of your image")
+			log.Error("Something wrong with the tags of your image: none given")
 			return
 		}
 
@@ -177,56 +187,65 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
+	log := o.log.Named("pull_image")
+
 	out, err := o.client.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
-		log.Errorf("Pull error: %s", err.Error())
+		log.Error("Error while pulling image", zap.String("image", imageName), zap.Error(err))
 		return
 	}
 
 	defer func(out io.ReadCloser) {
 		err := out.Close()
 		if err != nil {
-			log.Error("Somethings wrong while closing contaner pull err")
+			log.Warn("Something's wrong while closing contaner pull err", zap.Error(err))
 		}
 	}(out)
 
 	_, err = io.Copy(os.Stdout, out)
 	if err != nil {
-		log.Error("Wrong stream")
+		log.Error("Wrong stream", zap.Error(err))
 		return
 	}
 }
 
 func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string, imageId string, containerId string, containerName string, hostCfg *dockerContainer.HostConfig, labels map[string]string, endpointsCfg *EndpointsConfig) {
+	log := o.log.Named("update_image_and_container")
+
 	image := o.getImage(ctx, imageName)
 	if image.ID == imageId {
-		log.Println("Container is up to date")
+		log.Info("Container is up to date")
 		return
 	}
 	labels["com.docker.compose.image"] = image.ID
 
 	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
-		log.Errorf("While deleting old image and container: %s", err.Error())
+		log.Error("Error while deleting old image and container", zap.Error(err))
 	}
 
 	err = o.createNewContainer(ctx, imageName, hostCfg, containerName, &labels, endpointsCfg)
 	if err != nil {
-		log.Errorf("While creating new container: %s", err.Error())
+		log.Error("Error while creating new container", zap.Error(err))
 	}
 }
 
 func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSummary {
+	log := o.log.Named("get_image")
+
 	filters := dockerFilters.NewArgs()
 	filters.Add("reference", imageName)
+
 	images, err := o.client.ImageList(ctx, types.ImageListOptions{Filters: filters})
 	if err != nil {
-		log.Errorf("While getting image: %s", err.Error())
+		log.Error("Error while getting image", zap.Error(err))
 	}
 	return images[0]
 }
 
 func (o *Operator) getContainer(ctx context.Context, containerId string) types.Container {
+	log := o.log.Named("get_container")
+
 	filters := dockerFilters.NewArgs()
 	filters.Add("id", containerId)
 
@@ -234,13 +253,15 @@ func (o *Operator) getContainer(ctx context.Context, containerId string) types.C
 		Filters: filters,
 	})
 	if err != nil {
-		log.Errorf("While getting container: %s", err.Error())
+		log.Error("Error while getting container", zap.Error(err))
 	}
 	return containers[0]
 }
 
 func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}) {
-	composeConfig := readComposeConfig("docker-compose.yml")
+	log := o.log.Named("get_container_compose_config")
+
+	composeConfig := readComposeConfig("docker-compose.yml", log)
 
 	for _, serviceConfig := range composeConfig.Services {
 		if strings.HasSuffix(serviceConfig.Image, imageName) {
@@ -356,31 +377,33 @@ func (o *Operator) connectNetworks(ctx context.Context, containerId string, endp
 }
 
 func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
+	log := o.log.Named("configure_dns_mgmt_records")
+
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, id, false)
 	if err != nil {
 		return
 	}
 	labels := container.Config.Labels
 	if zoneLabelValue, ok := labels[dns.ZoneLabel]; ok {
-		ip, err := o.getIpInNetwork(ctx, id, labels[dns.NetworkLabel])
+		ip, _ := o.getIpInNetwork(ctx, id, labels[dns.NetworkLabel]) // TODO: handle error
 		aValue := labels[dns.ALabel]
 		err = o.dnsWrap.Get(ctx, zoneLabelValue, ip, aValue)
 		if err != nil {
-			log.Errorf("Dns error: %s", err.Error())
+			log.Error("DNS Error", zap.Error(err))
 		}
 	}
 }
 
-func readComposeConfig(path string) Config {
+func readComposeConfig(path string, log *zap.Logger) Config {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Errorf("No compose file: %s", err.Error())
+		log.Error("Error reading Compose file", zap.Error(err))
 	}
 
 	var data Config
 	err = yaml.Unmarshal(bytes, &data)
 	if err != nil {
-		log.Errorf("Unmarshal error: %s", err.Error())
+		log.Error("Error Unmarshal Compose file", zap.Error(err))
 	}
 	return data
 }
@@ -439,8 +462,8 @@ func getLinksAndAliases(networks map[string]*network.EndpointSettings, id string
 
 		if len(aliases) != 0 {
 			for i, value := range aliases {
-				if strings.HasPrefix(id, value){
-					aliases = append(aliases[:i], aliases[i +1 :]...)
+				if strings.HasPrefix(id, value) {
+					aliases = append(aliases[:i], aliases[i+1:]...)
 					break
 				}
 			}

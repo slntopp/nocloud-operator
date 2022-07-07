@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/slntopp/nocloud/pkg/dns/proto"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -13,9 +13,11 @@ type DnsWrap struct {
 	Network   string
 	DnsIp     string
 	DnsClient proto.DNSClient
+
+	log *zap.Logger
 }
 
-func NewDnsWrap(network string, dnsIp string, dnsMgmtIp string) *DnsWrap {
+func NewDnsWrap(log *zap.Logger, network, dnsIp, dnsMgmtIp string) *DnsWrap {
 	host := dnsMgmtIp + ":8080"
 	conn, err := grpc.Dial(host, grpc.WithBlock())
 	if err != nil {
@@ -23,10 +25,12 @@ func NewDnsWrap(network string, dnsIp string, dnsMgmtIp string) *DnsWrap {
 	}
 
 	dnsClient := proto.NewDNSClient(conn)
-	return &DnsWrap{Network: network, DnsIp: dnsIp, DnsClient: dnsClient}
+	return &DnsWrap{Network: network, DnsIp: dnsIp, DnsClient: dnsClient, log: log}
 }
 
 func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue string) error {
+	log := d.log.Named("get")
+
 	zone := proto.Zone{Name: zoneName}
 	get, err := d.DnsClient.Get(ctx, &zone)
 	if err != nil {
@@ -48,7 +52,6 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 		return err
 	}
 
-	log.Printf("From dns log %d", put.Result)
-
+	log.Info("Put DNS Record", zap.Int64("result", put.Result))
 	return nil
 }
