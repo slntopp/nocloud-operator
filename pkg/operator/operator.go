@@ -28,7 +28,6 @@ var wg sync.WaitGroup
 const (
 	TypeContainer = "container"
 	ActionStart   = "start"
-	ActionStop    = "stop"
 )
 
 type Operator struct {
@@ -121,7 +120,6 @@ func (o *Operator) ObserveContainers() {
 
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
-	var mutex sync.Mutex
 
 	ticker := time.NewTicker(time.Duration(o.config.Duration) * time.Second)
 	defer ticker.Stop()
@@ -129,8 +127,8 @@ func (o *Operator) ObserveContainers() {
 	for {
 		select {
 		case event := <-eventsChan:
-			if event.Type == TypeContainer && (event.Action == ActionStart || event.Action == ActionStop) {
-				go o.processEvent(ctx, event, &mutex)
+			if event.Type == TypeContainer && event.Action == ActionStart {
+				go o.processEvent(ctx, event)
 			}
 		case <-ticker.C:
 			wg.Add(len(o.containers))
@@ -148,17 +146,8 @@ func (o *Operator) ObserveContainers() {
 	}
 }
 
-func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex *sync.Mutex) {
+func (o *Operator) processEvent(ctx context.Context, event events.Message) {
 	log := o.log.Named("process_event")
-
-	if event.Action == ActionStop {
-		names := o.containers[event.ID].Names
-		log.Info("Container stopped", zap.String("id", event.ID), zap.Strings("names", names))
-		mutex.Lock()
-		delete(o.containers, event.ID)
-		mutex.Unlock()
-		return
-	}
 
 	container := o.getContainer(ctx, event.ID)
 	containerInfo := NewContainerInfo(&container)
@@ -323,6 +312,14 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 	if err != nil {
 		return err
 	}
+
+	log := o.log.Named("process_event")
+	names := o.containers[containerId].Names
+	log.Info("Container stopped", zap.String("id", containerId), zap.Strings("names", names))
+	o.mutex.Lock()
+	delete(o.containers, containerId)
+	o.mutex.Unlock()
+
 	return nil
 }
 
