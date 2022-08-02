@@ -23,6 +23,8 @@ import (
 	dockerClient "github.com/docker/docker/client"
 )
 
+var wg sync.WaitGroup
+
 const (
 	TypeContainer = "container"
 	ActionStart   = "start"
@@ -35,6 +37,10 @@ type Operator struct {
 	config     OperatorConfig
 	dnsWrap    *dns.DnsWrap
 	mutex      sync.Mutex
+
+	notRunningContainers []string
+	networkNames         map[string]*map[string]struct{}
+	endpoints            map[string]*EndpointsConfig
 
 	log *zap.Logger
 }
@@ -115,6 +121,7 @@ func (o *Operator) ObserveContainers() {
 
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
+	var mutex sync.Mutex
 
 	ticker := time.NewTicker(time.Duration(o.config.Duration) * time.Second)
 	defer ticker.Stop()
@@ -123,13 +130,16 @@ func (o *Operator) ObserveContainers() {
 		select {
 		case event := <-eventsChan:
 			if event.Type == TypeContainer && (event.Action == ActionStart || event.Action == ActionStop) {
-				go o.processEvent(ctx, event)
+				go o.processEvent(ctx, event, &mutex)
 			}
 		case <-ticker.C:
-			log.Info("Log after", zap.Int("seconds", o.config.Duration))
+			wg.Add(len(o.containers))
+			o.startErrorContainers(ctx)
 			for _, container := range o.containers {
 				go o.checkHash(ctx, container.Id)
 			}
+			wg.Wait()
+			log.Info("Another cycle")
 		case err := <-errorsChan:
 			log.Error("Error in channel", zap.Error(err))
 		default:
@@ -138,15 +148,15 @@ func (o *Operator) ObserveContainers() {
 	}
 }
 
-func (o *Operator) processEvent(ctx context.Context, event events.Message) {
+func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex *sync.Mutex) {
 	log := o.log.Named("process_event")
 
 	if event.Action == ActionStop {
 		names := o.containers[event.ID].Names
 		log.Info("Container stopped", zap.String("id", event.ID), zap.Strings("names", names))
-		o.mutex.Lock()
+		mutex.Lock()
 		delete(o.containers, event.ID)
-		o.mutex.Unlock()
+		mutex.Unlock()
 		return
 	}
 
@@ -161,6 +171,7 @@ func (o *Operator) processEvent(ctx context.Context, event events.Message) {
 }
 
 func (o *Operator) checkHash(ctx context.Context, containerId string) {
+	defer wg.Done()
 	log := o.log.Named("check_hash")
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
@@ -316,6 +327,7 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 }
 
 func (o *Operator) createNewContainer(ctx context.Context, imageName string, hostCfg *dockerContainer.HostConfig, containerName string, labels *map[string]string, e *EndpointsConfig) error {
+
 	containerConfig, networksNames := o.getContainerComposeConfig(imageName)
 	containerConfig.Labels = *labels
 
@@ -331,6 +343,9 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	}
 
 	if err := o.client.ContainerStart(ctx, create.ID, types.ContainerStartOptions{}); err != nil {
+		o.notRunningContainers = append(o.notRunningContainers, create.ID)
+		o.networkNames[create.ID] = networksNames
+		o.endpoints[create.ID] = e
 		return err
 	}
 
@@ -395,6 +410,22 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 			log.Error("DNS Error", zap.Error(err))
 		}
 	}
+}
+
+func (o *Operator) startErrorContainers(ctx context.Context) {
+	var tempIds []string
+	for _, value := range o.notRunningContainers {
+		err := o.client.ContainerStart(ctx, value, types.ContainerStartOptions{})
+		if err != nil {
+			networks, endpoints := o.networkNames[value], o.endpoints[value]
+			o.connectNetworks(ctx, value, networks, endpoints)
+			delete(o.networkNames, value)
+			delete(o.endpoints, value)
+			continue
+		}
+		tempIds = append(tempIds, value)
+	}
+	o.notRunningContainers = tempIds
 }
 
 func readComposeConfig(path string, log *zap.Logger) Config {

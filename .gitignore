@@ -4,3 +4,4 @@ reports/Corefile
 .env
 docker-compose.yml
 traefik.yml
+Makefile
