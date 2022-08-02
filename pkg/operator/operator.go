@@ -34,6 +34,7 @@ type Operator struct {
 	containers map[string]ContainerInfo
 	config     OperatorConfig
 	dnsWrap    *dns.DnsWrap
+	mutex      sync.Mutex
 
 	log *zap.Logger
 }
@@ -112,7 +113,6 @@ func (o *Operator) Ps() map[string]ContainerInfo {
 func (o *Operator) ObserveContainers() {
 	log := o.log.Named("Observer")
 
-	var mutex sync.Mutex
 	ctx := context.Background()
 	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
 
@@ -123,7 +123,7 @@ func (o *Operator) ObserveContainers() {
 		select {
 		case event := <-eventsChan:
 			if event.Type == TypeContainer && (event.Action == ActionStart || event.Action == ActionStop) {
-				go o.processEvent(ctx, event, &mutex)
+				go o.processEvent(ctx, event)
 			}
 		case <-ticker.C:
 			log.Info("Log after", zap.Int("seconds", o.config.Duration))
@@ -138,24 +138,24 @@ func (o *Operator) ObserveContainers() {
 	}
 }
 
-func (o *Operator) processEvent(ctx context.Context, event events.Message, mutex *sync.Mutex) {
+func (o *Operator) processEvent(ctx context.Context, event events.Message) {
 	log := o.log.Named("process_event")
 
 	if event.Action == ActionStop {
 		names := o.containers[event.ID].Names
 		log.Info("Container stopped", zap.String("id", event.ID), zap.Strings("names", names))
-		mutex.Lock()
+		o.mutex.Lock()
 		delete(o.containers, event.ID)
-		mutex.Unlock()
+		o.mutex.Unlock()
 		return
 	}
 
 	container := o.getContainer(ctx, event.ID)
 	containerInfo := NewContainerInfo(&container)
 
-	mutex.Lock()
+	o.mutex.Lock()
 	o.containers[containerInfo.Id] = *containerInfo
-	mutex.Unlock()
+	o.mutex.Unlock()
 
 	log.Info("Container started", zap.Any("info", containerInfo))
 }
