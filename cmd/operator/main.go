@@ -36,5 +36,7 @@ func main() {
 		log.Info("Found Container", zap.String("name", container.Names[0]), zap.String("image", container.Image))
 	}
 
+	operator.ConnectToTraefik()
+
 	operator.ObserveContainers()
 }

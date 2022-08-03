@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"github.com/slntopp/nocloud-operator/pkg/traefik"
 	"io"
 	"io/ioutil"
 	"os"
@@ -31,11 +32,13 @@ const (
 )
 
 type Operator struct {
-	client     *dockerClient.Client
-	containers map[string]ContainerInfo
-	config     OperatorConfig
-	dnsWrap    *dns.DnsWrap
-	mutex      sync.Mutex
+	client        *dockerClient.Client
+	containers    map[string]ContainerInfo
+	config        OperatorConfig
+	dnsWrap       *dns.DnsWrap
+	mutex         sync.Mutex
+	traefikClient *traefik.TraefikClient
+	traefikId     string
 
 	notRunningContainers []string
 	networkNames         map[string]*map[string]struct{}
@@ -100,6 +103,35 @@ func (o *Operator) ConfigureDns() error {
 	return nil
 }
 
+func (o *Operator) ConnectToTraefik() {
+	list, _ := o.client.ContainerList(context.Background(), types.ContainerListOptions{})
+
+	var ip string
+
+	for _, item := range list {
+		if item.Image == "traefik:latest" {
+			for key, network := range item.NetworkSettings.Networks {
+				if strings.HasSuffix(key, "proxy") {
+					ip = network.IPAddress
+					o.traefikId = item.ID
+				}
+			}
+		}
+	}
+	o.traefikClient = traefik.NewTraefikClient(ip)
+}
+
+func (o *Operator) CheckTraefik(ctx context.Context) {
+	log := o.log.Named("check_traefik")
+	if o.traefikClient.GetCountOfServices() != len(readComposeConfig("docker-compose.yml", log).Services) {
+		duration := 5 * time.Second
+		err := o.client.ContainerRestart(ctx, o.traefikId, &duration)
+		if err != nil {
+			log.Error("Wrong traefik restart")
+		}
+	}
+}
+
 func (o *Operator) Ps() map[string]ContainerInfo {
 	log := o.log.Named("ps")
 	ctx := context.Background()
@@ -137,6 +169,7 @@ func (o *Operator) ObserveContainers() {
 				go o.checkHash(ctx, container.Id)
 			}
 			wg.Wait()
+			o.CheckTraefik(ctx)
 			log.Info("Another cycle")
 		case err := <-errorsChan:
 			log.Error("Error in channel", zap.Error(err))
@@ -410,6 +443,9 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 }
 
 func (o *Operator) startErrorContainers(ctx context.Context) {
+	if len(o.notRunningContainers) == 0 {
+		return
+	}
 	var tempIds []string
 	for _, value := range o.notRunningContainers {
 		err := o.client.ContainerStart(ctx, value, types.ContainerStartOptions{})
@@ -423,6 +459,7 @@ func (o *Operator) startErrorContainers(ctx context.Context) {
 		tempIds = append(tempIds, value)
 	}
 	o.notRunningContainers = tempIds
+	o.CheckTraefik(ctx)
 }
 
 func readComposeConfig(path string, log *zap.Logger) Config {
