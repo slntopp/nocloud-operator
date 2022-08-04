@@ -17,7 +17,7 @@ func init() {
 }
 
 func main() {
-	time.Sleep(10 * time.Second)
+	time.Sleep(1 * time.Minute)
 
 	defer func() {
 		_ = log.Sync()
@@ -29,6 +29,8 @@ func main() {
 	}
 
 	operator := dockerOperator.NewOperator(log)
+	operator.Wait()
+
 	err = operator.ConfigureDns()
 	if err != nil {
 		log.Fatal("Error Configuring DNS", zap.Error(err))
@@ -36,7 +38,7 @@ func main() {
 
 	containers := operator.Ps()
 	for _, container := range containers {
-		log.Info("Found Container", zap.String("name", container.Names[0]), zap.String("image", container.Image))
+		log.Info("Found Container", zap.String("name", container.Names[0]), zap.String("image", container.Image), zap.String("id", container.ShortId))
 	}
 
 	operator.ConnectToTraefik()

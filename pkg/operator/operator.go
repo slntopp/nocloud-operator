@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,23 @@ func NewOperator(logger *zap.Logger) *Operator {
 	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log}
 }
 
+func (o *Operator) Wait() {
+	wait := true
+	log := o.log.Named("wait")
+	config := readComposeConfig("docker-compose.yml", log)
+	for wait {
+		list, err := o.client.ContainerList(context.Background(), types.ContainerListOptions{})
+		if err != nil {
+			return
+		}
+		if len(config.Services) == len(list) {
+			wait = false
+		}
+		log.Info("Waiting for all containers start")
+		time.Sleep(5 * time.Second)
+	}
+}
+
 func (o *Operator) ConfigureDns() error {
 	log := o.log.Named("configure_dns")
 	ctx := context.Background()
@@ -111,14 +129,16 @@ func (o *Operator) ConnectToTraefik() {
 
 	for _, item := range list {
 		if item.Image == "traefik:latest" {
-			for key, network := range item.NetworkSettings.Networks {
+			for key, net := range item.NetworkSettings.Networks {
 				if strings.HasSuffix(key, "proxy") {
-					ip = network.IPAddress
+					ip = net.IPAddress
 					o.traefikId = item.ID
 					log.Info("IP " + ip)
 					log.Info("ID " + item.ID)
+					break
 				}
 			}
+			break
 		}
 	}
 	o.traefikClient = traefik.NewTraefikClient(ip)
@@ -126,7 +146,15 @@ func (o *Operator) ConnectToTraefik() {
 
 func (o *Operator) CheckTraefik(ctx context.Context) {
 	log := o.log.Named("check_traefik")
-	if o.traefikClient.GetCountOfServices() != len(readComposeConfig("docker-compose.yml", log).Services) {
+	traefikServices := o.traefikClient.GetCountOfServices()
+	configServices := len(readComposeConfig("docker-compose.yml", log).Services)
+
+	log.Info("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
+	log.Info(strconv.Itoa(traefikServices))
+	log.Info(strconv.Itoa(configServices))
+
+	if traefikServices != configServices {
 		o.RestartTraefik(ctx, o.traefikId)
 	}
 }
@@ -153,6 +181,8 @@ func (o *Operator) RestartTraefik(ctx context.Context, id string) {
 		return
 	}
 
+	delete(o.containers, id)
+
 	err = o.createNewContainer(context.Background(), "traefik:latest", container.HostConfig, container.Name, &container.Config.Labels, endpointsConfig)
 	if err != nil {
 		log.Error("Somethings wrong")
@@ -163,6 +193,11 @@ func (o *Operator) RestartTraefik(ctx context.Context, id string) {
 
 func (o *Operator) Ps() map[string]ContainerInfo {
 	log := o.log.Named("ps")
+
+	for key := range o.containers {
+		delete(o.containers, key)
+	}
+
 	ctx := context.Background()
 	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
@@ -190,6 +225,7 @@ func (o *Operator) ObserveContainers() {
 		case <-ticker.C:
 			wg.Add(len(o.containers))
 			o.startErrorContainers(ctx)
+			o.Ps()
 			for _, container := range o.containers {
 				go o.checkHash(ctx, container.Id)
 			}
