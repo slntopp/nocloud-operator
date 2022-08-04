@@ -104,6 +104,7 @@ func (o *Operator) ConfigureDns() error {
 }
 
 func (o *Operator) ConnectToTraefik() {
+	log := o.log.Named("connection_to_traefik")
 	list, _ := o.client.ContainerList(context.Background(), types.ContainerListOptions{})
 
 	var ip string
@@ -114,6 +115,8 @@ func (o *Operator) ConnectToTraefik() {
 				if strings.HasSuffix(key, "proxy") {
 					ip = network.IPAddress
 					o.traefikId = item.ID
+					log.Info("IP " + ip)
+					log.Info("ID " + item.ID)
 				}
 			}
 		}
@@ -124,12 +127,38 @@ func (o *Operator) ConnectToTraefik() {
 func (o *Operator) CheckTraefik(ctx context.Context) {
 	log := o.log.Named("check_traefik")
 	if o.traefikClient.GetCountOfServices() != len(readComposeConfig("docker-compose.yml", log).Services) {
-		duration := 5 * time.Second
-		err := o.client.ContainerRestart(ctx, o.traefikId, &duration)
-		if err != nil {
-			log.Error("Wrong traefik restart")
-		}
+		o.RestartTraefik(ctx, o.traefikId)
 	}
+}
+
+func (o *Operator) RestartTraefik(ctx context.Context, id string) {
+	log := o.log.Named("Restart traefik")
+	container, _, err := o.client.ContainerInspectWithRaw(ctx, id, false)
+	if err != nil {
+		log.Error("Somethings wrong")
+		return
+	}
+	endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks, container.ID)
+
+	duration := 5 * time.Second
+	err = o.client.ContainerStop(ctx, id, &duration)
+	if err != nil {
+		log.Error("Somethings wrong")
+		return
+	}
+
+	err = o.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{})
+	if err != nil {
+		log.Error("Somethings wrong")
+		return
+	}
+
+	err = o.createNewContainer(context.Background(), "traefik:latest", container.HostConfig, container.Name, &container.Config.Labels, endpointsConfig)
+	if err != nil {
+		log.Error("Somethings wrong")
+		return
+	}
+	o.ConnectToTraefik()
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {
@@ -151,17 +180,13 @@ func (o *Operator) ObserveContainers() {
 	log := o.log.Named("Observer")
 
 	ctx := context.Background()
-	eventsChan, errorsChan := o.client.Events(ctx, types.EventsOptions{})
+	_, errorsChan := o.client.Events(ctx, types.EventsOptions{})
 
 	ticker := time.NewTicker(time.Duration(o.config.Duration) * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case event := <-eventsChan:
-			if event.Type == TypeContainer && event.Action == ActionStart {
-				go o.processEvent(ctx, event)
-			}
 		case <-ticker.C:
 			wg.Add(len(o.containers))
 			o.startErrorContainers(ctx)
@@ -378,6 +403,13 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 		o.endpoints[create.ID] = e
 		return err
 	}
+
+	container := o.getContainer(ctx, create.ID)
+	containerInfo := NewContainerInfo(&container)
+
+	o.mutex.Lock()
+	o.containers[containerInfo.Id] = *containerInfo
+	o.mutex.Unlock()
 
 	err = o.connectNetworks(ctx, create.ID, networksNames, e)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	dockerOperator "github.com/slntopp/nocloud-operator/pkg/operator"
 	"github.com/slntopp/nocloud/pkg/nocloud"
 	"go.uber.org/zap"
+	"time"
 )
 
 var (
@@ -16,6 +17,8 @@ func init() {
 }
 
 func main() {
+	time.Sleep(10 * time.Second)
+
 	defer func() {
 		_ = log.Sync()
 	}()
