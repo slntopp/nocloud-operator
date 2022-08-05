@@ -147,14 +147,24 @@ func (o *Operator) ConnectToTraefik() {
 func (o *Operator) CheckTraefik(ctx context.Context) {
 	log := o.log.Named("check_traefik")
 	traefikServices := o.traefikClient.GetCountOfServices()
-	configServices := len(readComposeConfig("docker-compose.yml", log).Services) - 1
+	configServices := readComposeConfig("docker-compose.yml", log).Services
+	filteredConfigServices := 0
+
+	for _, value := range configServices {
+		for _, label := range value.Labels {
+			if strings.HasPrefix(label, "traefik.enable") {
+				filteredConfigServices += 1
+				break
+			}
+		}
+	}
 
 	log.Info("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 
 	log.Info(strconv.Itoa(traefikServices))
-	log.Info(strconv.Itoa(configServices))
+	log.Info(strconv.Itoa(filteredConfigServices))
 
-	if traefikServices != configServices {
+	if traefikServices != filteredConfigServices {
 		o.RestartTraefik(ctx, o.traefikId)
 	}
 }
