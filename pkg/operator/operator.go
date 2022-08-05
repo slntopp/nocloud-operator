@@ -147,7 +147,7 @@ func (o *Operator) ConnectToTraefik() {
 func (o *Operator) CheckTraefik(ctx context.Context) {
 	log := o.log.Named("check_traefik")
 	traefikServices := o.traefikClient.GetCountOfServices()
-	configServices := len(readComposeConfig("docker-compose.yml", log).Services)
+	configServices := len(readComposeConfig("docker-compose.yml", log).Services) - 1
 
 	log.Info("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 
@@ -230,6 +230,7 @@ func (o *Operator) ObserveContainers() {
 				go o.checkHash(ctx, container.Id)
 			}
 			wg.Wait()
+			time.Sleep(10 * time.Second)
 			o.CheckTraefik(ctx)
 			log.Info("Another cycle")
 		case err := <-errorsChan:
@@ -316,6 +317,7 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	}
 	labels["com.docker.compose.image"] = image.ID
 
+	o.mutex.Lock()
 	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
 		log.Error("Error while deleting old image and container", zap.Error(err))
@@ -325,6 +327,7 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	if err != nil {
 		log.Error("Error while creating new container", zap.Error(err))
 	}
+	o.mutex.Unlock()
 }
 
 func (o *Operator) getImage(ctx context.Context, imageName string) types.ImageSummary {
@@ -410,9 +413,7 @@ func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, 
 	log := o.log.Named("process_event")
 	names := o.containers[containerId].Names
 	log.Info("Container stopped", zap.String("id", containerId), zap.Strings("names", names))
-	o.mutex.Lock()
 	delete(o.containers, containerId)
-	o.mutex.Unlock()
 
 	return nil
 }
@@ -443,9 +444,7 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	container := o.getContainer(ctx, create.ID)
 	containerInfo := NewContainerInfo(&container)
 
-	o.mutex.Lock()
 	o.containers[containerInfo.Id] = *containerInfo
-	o.mutex.Unlock()
 
 	err = o.connectNetworks(ctx, create.ID, networksNames, e)
 	if err != nil {
