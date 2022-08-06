@@ -171,34 +171,13 @@ func (o *Operator) CheckTraefik(ctx context.Context) {
 
 func (o *Operator) RestartTraefik(ctx context.Context, id string) {
 	log := o.log.Named("Restart traefik")
-	container, _, err := o.client.ContainerInspectWithRaw(ctx, id, false)
+	log.Info("Restart")
+	duration := 10 * time.Second
+	err := o.client.ContainerRestart(ctx, id, &duration)
 	if err != nil {
-		log.Error("Somethings wrong")
+		log.Error("FUCK")
 		return
 	}
-	endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks, container.ID)
-
-	duration := 5 * time.Second
-	err = o.client.ContainerStop(ctx, id, &duration)
-	if err != nil {
-		log.Error("Somethings wrong")
-		return
-	}
-
-	err = o.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{})
-	if err != nil {
-		log.Error("Somethings wrong")
-		return
-	}
-
-	delete(o.containers, id)
-
-	err = o.createNewContainer(context.Background(), "traefik:latest", container.HostConfig, container.Name, &container.Config.Labels, endpointsConfig)
-	if err != nil {
-		log.Error("Somethings wrong")
-		return
-	}
-	o.ConnectToTraefik()
 }
 
 func (o *Operator) Ps() map[string]ContainerInfo {

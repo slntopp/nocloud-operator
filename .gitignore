@@ -5,3 +5,5 @@ reports/Corefile
 docker-compose.yml
 traefik.yml
 Makefile
+ft.json
+st.json
