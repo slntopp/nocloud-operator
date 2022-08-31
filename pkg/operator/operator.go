@@ -89,13 +89,13 @@ func (o *Operator) Wait() {
 func (o *Operator) ConfigureDns() error {
 	log := o.log.Named("configure_dns")
 	ctx := context.Background()
-	containersList, err := o.client.NetworkList(ctx, types.NetworkListOptions{})
+	containersList, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		return err
 	}
 
-	dnsCheck, dnsMgmtCheck := false, false
-	dnsIp, dnsMgmtIp, dnsNetworkName := "", "", ""
+	dnsCheck := false
+	dnsIp, dnsNetworkName := "", ""
 
 	for _, container := range containersList {
 		if _, serverLabelOk := container.Labels[dns.ServerLabel]; serverLabelOk {
@@ -105,16 +105,10 @@ func (o *Operator) ConfigureDns() error {
 			}
 			dnsNetworkName = container.Labels[dns.NetworkLabel]
 			dnsCheck = true
-		} else if _, apiLabelOk := container.Labels[dns.ApiLabel]; apiLabelOk {
-			dnsMgmtIp, err = o.getIpInNetwork(ctx, container.ID, container.Labels[dns.NetworkLabel])
-			if err != nil {
-				return err
-			}
-			dnsMgmtCheck = true
 		}
 
-		if dnsCheck && dnsMgmtCheck {
-			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp, dnsMgmtIp)
+		if dnsCheck {
+			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp)
 			return nil
 		}
 	}

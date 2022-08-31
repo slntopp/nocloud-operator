@@ -17,8 +17,8 @@ type DnsWrap struct {
 	log *zap.Logger
 }
 
-func NewDnsWrap(log *zap.Logger, network, dnsIp, dnsMgmtIp string) *DnsWrap {
-	host := dnsMgmtIp + ":8080"
+func NewDnsWrap(log *zap.Logger, network, dnsIp string) *DnsWrap {
+	host := "dns-mgmt:8000"
 	conn, err := grpc.Dial(host, grpc.WithBlock())
 	if err != nil {
 		log.Fatal("Something bad with dns client")
