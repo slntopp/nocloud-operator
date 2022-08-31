@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/slntopp/nocloud-operator/pkg/traefik"
 	"google.golang.org/grpc/metadata"
@@ -96,7 +97,6 @@ func (o *Operator) ConfigureDns() error {
 		return err
 	}
 
-	dnsCheck := false
 	dnsIp, dnsNetworkName := "", ""
 
 	for _, container := range containersList {
@@ -106,15 +106,12 @@ func (o *Operator) ConfigureDns() error {
 				return err
 			}
 			dnsNetworkName = container.Labels[dns.NetworkLabel]
-			dnsCheck = true
-		}
 
-		if dnsCheck {
 			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp)
 			return nil
 		}
 	}
-	return nil
+	return errors.New("no dns server")
 }
 
 func (o *Operator) ConnectToTraefik() {
@@ -441,12 +438,19 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 }
 
 func (o *Operator) getIpInNetwork(ctx context.Context, containerId string, networkName string) (string, error) {
+	log := o.log.Named(fmt.Sprintf("Attempt to get ip. Container: %s, Network: %s", containerId, networkName))
 	containerInfo, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
+		log.Error("Something wrong with docker", zap.String("err", err.Error()))
 		return "", err
 	}
 
-	return containerInfo.NetworkSettings.Networks[o.config.ComposePrefix+networkName].IPAddress, nil
+	if info, ok := containerInfo.NetworkSettings.Networks[o.config.ComposePrefix+networkName]; !ok {
+		log.Error("No such network")
+		return "", errors.New("no such network")
+	} else {
+		return info.IPAddress, nil
+	}
 }
 
 func (o *Operator) connectNetworks(ctx context.Context, containerId string, endpointsNames *map[string]struct{}, config *EndpointsConfig) error {
@@ -486,7 +490,11 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 	}
 	labels := container.Config.Labels
 	if zoneLabelValue, ok := labels[dns.ZoneLabel]; ok {
-		ip, _ := o.getIpInNetwork(ctx, id, labels[dns.NetworkLabel]) // TODO: handle error
+		ip, err := o.getIpInNetwork(ctx, id, labels[dns.NetworkLabel]) // TODO: handle error
+		if err != nil {
+			log.Error("Fail to get ip in zone", zap.String("container id", id))
+			return
+		}
 		aValue := labels[dns.ALabel]
 		err = o.dnsWrap.Get(ctx, zoneLabelValue, ip, aValue)
 		if err != nil {
