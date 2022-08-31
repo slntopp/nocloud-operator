@@ -7,6 +7,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/joho/godotenv v1.4.0
 	github.com/slntopp/nocloud v0.0.15-r17
+	github.com/spf13/viper v1.12.0
 	go.uber.org/zap v1.22.0
 	google.golang.org/grpc v1.49.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -14,11 +15,15 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
+	github.com/arangodb/go-driver v1.3.3 // indirect
+	github.com/arangodb/go-velocypack v0.0.0-20200318135517-5af53c29c67e // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
@@ -36,7 +41,6 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/spf13/viper v1.12.0 // indirect
 	github.com/stretchr/testify v1.7.2 // indirect
 	github.com/subosito/gotenv v1.3.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
