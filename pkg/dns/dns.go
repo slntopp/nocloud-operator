@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"google.golang.org/grpc/credentials/insecure"
 	"time"
 
 	"github.com/slntopp/nocloud/pkg/dns/proto"
@@ -19,7 +20,7 @@ type DnsWrap struct {
 
 func NewDnsWrap(log *zap.Logger, network, dnsIp string) *DnsWrap {
 	host := "dns-mgmt:8000"
-	conn, err := grpc.Dial(host, grpc.WithBlock())
+	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err.Error())
 	}

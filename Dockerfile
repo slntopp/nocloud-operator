@@ -1,6 +1,6 @@
 ARG APP_PATH=/go/src/github.com/slntopp/nocloud-operator
 
-FROM golang:1.18-alpine as builder
+FROM golang:1.19-alpine as builder
 ARG APP_PATH
 
 RUN apk add upx
