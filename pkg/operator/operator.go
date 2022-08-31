@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/slntopp/nocloud-operator/pkg/traefik"
+	"google.golang.org/grpc/metadata"
 	"io"
 	"io/ioutil"
 	"os"
@@ -40,6 +41,7 @@ type Operator struct {
 	mutex         sync.Mutex
 	traefikClient *traefik.TraefikClient
 	traefikId     string
+	token         string
 
 	notRunningContainers []string
 	networkNames         map[string]*map[string]struct{}
@@ -48,7 +50,7 @@ type Operator struct {
 	log *zap.Logger
 }
 
-func NewOperator(logger *zap.Logger) *Operator {
+func NewOperator(logger *zap.Logger, token string) *Operator {
 	log := logger.Named("Operator")
 	cli, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv, dockerClient.WithAPIVersionNegotiation())
 	if err != nil {
@@ -66,7 +68,7 @@ func NewOperator(logger *zap.Logger) *Operator {
 		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
-	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log}
+	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log, token: token}
 }
 
 func (o *Operator) Wait() {
@@ -182,6 +184,7 @@ func (o *Operator) Ps() map[string]ContainerInfo {
 	}
 
 	ctx := context.Background()
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+o.token)
 	containers, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
 	if err != nil {
 		log.Fatal("Error listing Containers", zap.Error(err))

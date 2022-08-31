@@ -4,15 +4,22 @@ import (
 	"github.com/joho/godotenv"
 	dockerOperator "github.com/slntopp/nocloud-operator/pkg/operator"
 	"github.com/slntopp/nocloud/pkg/nocloud"
+	"github.com/slntopp/nocloud/pkg/nocloud/auth"
+	"github.com/slntopp/nocloud/pkg/nocloud/schema"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
 var (
-	log *zap.Logger
+	log         *zap.Logger
+	SIGNING_KEY []byte
 )
 
 func init() {
 	log = nocloud.NewLogger()
+
+	viper.SetDefault("SIGNING_KEY", "seeeecreet")
+	SIGNING_KEY = []byte(viper.GetString("SIGNING_KEY"))
 }
 
 func main() {
@@ -25,7 +32,13 @@ func main() {
 		log.Fatal("Error loading .env file", zap.Error(err))
 	}
 
-	operator := dockerOperator.NewOperator(log)
+	auth.SetContext(log, SIGNING_KEY)
+	token, err := auth.MakeToken(schema.ROOT_ACCOUNT_KEY)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	operator := dockerOperator.NewOperator(log, token)
 	operator.Wait()
 
 	err = operator.ConfigureDns()
