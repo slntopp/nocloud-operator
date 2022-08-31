@@ -523,6 +523,16 @@ func (o *Operator) startErrorContainers(ctx context.Context) {
 	o.CheckTraefik(ctx)
 }
 
+// TODO : complete this method
+func (o *Operator) RestartWithDnsConfig(ctx context.Context, id string) error {
+	duration := 10 * time.Second
+	err := o.client.ContainerStop(ctx, id, &duration)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func readComposeConfig(path string, log *zap.Logger) Config {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
