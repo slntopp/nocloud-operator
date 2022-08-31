@@ -21,7 +21,7 @@ func NewDnsWrap(log *zap.Logger, network, dnsIp string) *DnsWrap {
 	host := "dns-mgmt:8000"
 	conn, err := grpc.Dial(host, grpc.WithBlock())
 	if err != nil {
-		log.Fatal("Something bad with dns client")
+		log.Fatal(err.Error())
 	}
 
 	dnsClient := proto.NewDNSClient(conn)
