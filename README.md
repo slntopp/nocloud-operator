@@ -7,13 +7,18 @@ ___
 To get start you need __operator-config.yaml__ file
 
 ```yaml
-duration: 30
-composePrefix: "docker-operator_"
+duration: 10
+composePrefix: "nocloud-operator_"
+username: "username"
+password: "pass"
+serverAddress: "ghcr.io"
 ```
 
 __Duration__ - the amount of time in __seconds__ after which the operator will start the update
 
 __ComposePrefix__ - name of project where you start you containers
+
+__Username__, __Password__, __ServerAddress__ - credentials for docker
 
 ### Example of docker-compose file for operator
 

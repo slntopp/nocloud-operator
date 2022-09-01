@@ -1,2 +1,5 @@
 duration: 10
 composePrefix: "nocloud-operator_"
+username: "username"
+password: "pass"
+serverAddress: "ghcr.io"
