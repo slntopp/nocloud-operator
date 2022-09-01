@@ -529,10 +529,8 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	if _, ok := containerConfig.Labels[dns.WithDriversLabel]; ok {
 		drivers := make([]string, 0)
 
-		if o.drivers != nil {
-			for key, _ := range o.drivers {
-				drivers = append(drivers, key)
-			}
+		for key := range o.drivers {
+			drivers = append(drivers, key)
 		}
 
 		stringDrivers := strings.Join(drivers, " ")
