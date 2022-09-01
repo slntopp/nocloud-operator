@@ -40,6 +40,11 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 
 	location, ok := get.Locations[aValue]
 	if !ok {
+
+		if get.Locations == nil {
+			get.Locations = make(map[string]*proto.Record)
+		}
+
 		get.Locations[aValue] = &proto.Record{A: make([]*proto.Record_A, 1), Txt: make([]*proto.Record_TXT, 0)}
 	}
 
