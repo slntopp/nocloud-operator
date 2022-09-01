@@ -23,6 +23,7 @@ import (
 	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/registry"
 	dockerClient "github.com/docker/docker/client"
 )
 
@@ -64,17 +65,25 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
-	l, err := cli.RegistryLogin(context.Background(), types.AuthConfig{
-		Username:      data.Username,
-		Password:      data.Password,
-		ServerAddress: data.ServerAddress,
-	})
+	var l registry.AuthenticateOKBody
 
-	if err != nil {
-		return nil
+	if data.Username != "" && data.Password != "" && data.ServerAddress != "" {
+		l, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
+			Username:      data.Username,
+			Password:      data.Password,
+			ServerAddress: data.ServerAddress,
+		})
+
+		if err != nil {
+			log.Fatal("No registry", zap.Error(err))
+		}
 	}
 
-	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log, token: token, dockerToken: l.IdentityToken}
+	operator := &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log, token: token}
+
+	operator.dockerToken = l.IdentityToken
+
+	return operator
 }
 
 func (o *Operator) Wait() {
