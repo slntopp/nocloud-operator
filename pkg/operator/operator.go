@@ -67,11 +67,11 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 
 	var l registry.AuthenticateOKBody
 
-	if data.Username != "" && data.Password != "" && data.ServerAddress != "" {
+	if data.DockerRegistries.Username != "" && data.DockerRegistries.Password != "" && data.DockerRegistries.ServerAddress != "" {
 		l, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
-			Username:      data.Username,
-			Password:      data.Password,
-			ServerAddress: data.ServerAddress,
+			Username:      data.DockerRegistries.Username,
+			Password:      data.DockerRegistries.Password,
+			ServerAddress: data.DockerRegistries.ServerAddress,
 		})
 
 		if err != nil {

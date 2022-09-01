@@ -1,9 +1,13 @@
 package operator
 
-type OperatorConfig struct {
-	Duration      int    `yaml:"duration"`
-	ComposePrefix string `yaml:"composePrefix"`
+type Registries struct {
 	Username      string `yaml:"username"`
 	Password      string `yaml:"password"`
 	ServerAddress string `yaml:"serverAddress"`
+}
+
+type OperatorConfig struct {
+	Duration         int        `yaml:"duration"`
+	ComposePrefix    string     `yaml:"composePrefix"`
+	DockerRegistries Registries `yaml:"registries"`
 }
