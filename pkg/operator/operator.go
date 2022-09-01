@@ -450,7 +450,7 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	containerConfig.Labels = *labels
 
 	if _, ok := containerConfig.Labels[dns.DnsRequiredLabel]; ok {
-		hostCfg.DNS = []string{o.dnsWrap.DnsIp}
+		hostCfg.DNS = []string{o.dnsWrap.DnsIp, "8.8.8.8", "8.8.4.4"}
 		hostCfg.DNSSearch = []string{}
 		hostCfg.DNSOptions = []string{}
 	}
