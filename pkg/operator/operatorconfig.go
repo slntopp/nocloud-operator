@@ -10,4 +10,5 @@ type OperatorConfig struct {
 	Duration         int        `yaml:"duration"`
 	ComposePrefix    string     `yaml:"composePrefix"`
 	DockerRegistries Registries `yaml:"registries"`
+	Dns              []string   `yaml:"dns"`
 }

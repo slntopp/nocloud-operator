@@ -5,3 +5,7 @@ registries:
   #   username: "username"
   #   password: "pass"
   #   serverAddress: "ghcr.io"
+
+dns:
+  -8.8.8.8
+  -8.8.4.4

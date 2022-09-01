@@ -39,6 +39,7 @@ type Operator struct {
 	traefikId     string
 	token         string
 	dockerToken   string
+	defaultDns    []string
 
 	notRunningContainers []string
 	networkNames         map[string]*map[string]struct{}
@@ -79,7 +80,14 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		}
 	}
 
-	operator := &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log, token: token}
+	operator := &Operator{
+		client:     cli,
+		containers: map[string]ContainerInfo{},
+		config:     data,
+		log:        log,
+		token:      token,
+		defaultDns: data.Dns,
+	}
 
 	operator.dockerToken = l.IdentityToken
 
@@ -472,7 +480,8 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	containerConfig.Labels = *labels
 
 	if _, ok := containerConfig.Labels[dns.DnsRequiredLabel]; ok {
-		hostCfg.DNS = []string{o.dnsWrap.DnsIp, "8.8.8.8", "8.8.4.4"}
+		hostCfg.DNS = []string{o.dnsWrap.DnsIp}
+		hostCfg.DNS = append(hostCfg.DNS, o.defaultDns...)
 		hostCfg.DNSSearch = []string{}
 		hostCfg.DNSOptions = []string{}
 	}
