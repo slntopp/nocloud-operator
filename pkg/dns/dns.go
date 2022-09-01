@@ -45,16 +45,19 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 			get.Locations = make(map[string]*proto.Record)
 		}
 
-		get.Locations[aValue] = &proto.Record{A: make([]*proto.Record_A, 1), Txt: make([]*proto.Record_TXT, 0)}
+		get.Locations[aValue] = &proto.Record{A: make([]*proto.Record_A, 1), Txt: make([]*proto.Record_TXT, 1)}
 	}
 
 	location := get.Locations[aValue]
 	if location.A[0] == nil {
 		location.A[0] = &proto.Record_A{}
 	}
+	if location.Txt[0] == nil {
+		location.Txt[0] = &proto.Record_TXT{}
+	}
 	location.A[0].Ip = ip
 	location.A[0].Ttl = 300
-	location.Txt = append(location.Txt, &proto.Record_TXT{Text: "Was changed by operator at " + time.Now().UTC().String()})
+	location.Txt[0] = &proto.Record_TXT{Text: "Was changed by operator at " + time.Now().UTC().String()}
 	get.Locations[aValue] = location
 
 	put, err := d.DnsClient.Put(ctx, get)
