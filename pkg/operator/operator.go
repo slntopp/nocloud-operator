@@ -22,17 +22,11 @@ import (
 
 	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/events"
 	dockerFilters "github.com/docker/docker/api/types/filters"
 	dockerClient "github.com/docker/docker/client"
 )
 
 var wg sync.WaitGroup
-
-const (
-	TypeContainer = "container"
-	ActionStart   = "start"
-)
 
 type Operator struct {
 	client        *dockerClient.Client
@@ -114,6 +108,68 @@ func (o *Operator) ConfigureDns() error {
 	return errors.New("no dns server")
 }
 
+func (o *Operator) SetDnsIpToContainers() error {
+	log := o.log.Named("set_dns_ip")
+	ctx := context.Background()
+	containersList, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, container := range containersList {
+		if _, ok := container.Labels[dns.DnsRequiredLabel]; ok {
+			err := o.restartWithDnsConfig(ctx, container.ID)
+			if err != nil {
+				log.Fatal("Fail to set DNS ip", zap.String("err", err.Error()))
+			}
+		}
+	}
+	return nil
+}
+
+func (o *Operator) restartWithDnsConfig(ctx context.Context, id string) error {
+	log := o.log.Named("restart_container_with_dns")
+	container, _, err := o.client.ContainerInspectWithRaw(ctx, id, false)
+	if err != nil {
+		return err
+	}
+
+	labels := container.Config.Labels
+
+	image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
+	if err != nil {
+		return err
+	}
+
+	if len(image.RepoTags) == 0 {
+		log.Error("Something wrong with the tags of your image: none given")
+		return err
+	}
+
+	endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks, container.ID)
+
+	duration := 5 * time.Second
+	err = o.client.ContainerStop(ctx, id, &duration)
+	if err != nil {
+		return err
+	}
+
+	err = o.client.ContainerRemove(ctx, id, types.ContainerRemoveOptions{})
+	if err != nil {
+		return err
+	}
+
+	names := o.containers[id].Names
+	log.Info("Container stopped", zap.String("id", id), zap.Strings("names", names))
+	delete(o.containers, id)
+
+	err = o.createNewContainer(ctx, image.RepoTags[0], container.HostConfig, container.Name, &labels, endpointsConfig)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (o *Operator) ConnectToTraefik() {
 	log := o.log.Named("connection_to_traefik")
 	list, _ := o.client.ContainerList(context.Background(), types.ContainerListOptions{})
@@ -189,7 +245,7 @@ func (o *Operator) Ps() map[string]ContainerInfo {
 
 	for _, container := range containers {
 		o.containers[container.ID] = *NewContainerInfo(&container)
-		go o.configureDnsMgmtRecords(ctx, container.ID)
+		o.configureDnsMgmtRecords(ctx, container.ID)
 	}
 	return o.containers
 }
@@ -222,19 +278,6 @@ func (o *Operator) ObserveContainers() {
 			continue
 		}
 	}
-}
-
-func (o *Operator) processEvent(ctx context.Context, event events.Message) {
-	log := o.log.Named("process_event")
-
-	container := o.getContainer(ctx, event.ID)
-	containerInfo := NewContainerInfo(&container)
-
-	o.mutex.Lock()
-	o.containers[containerInfo.Id] = *containerInfo
-	o.mutex.Unlock()
-
-	log.Info("Container started", zap.Any("info", containerInfo))
 }
 
 func (o *Operator) checkHash(ctx context.Context, containerId string) {
@@ -521,16 +564,6 @@ func (o *Operator) startErrorContainers(ctx context.Context) {
 	}
 	o.notRunningContainers = tempIds
 	o.CheckTraefik(ctx)
-}
-
-// TODO : complete this method
-func (o *Operator) RestartWithDnsConfig(ctx context.Context, id string) error {
-	duration := 10 * time.Second
-	err := o.client.ContainerStop(ctx, id, &duration)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func readComposeConfig(path string, log *zap.Logger) Config {

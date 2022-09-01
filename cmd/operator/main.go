@@ -46,6 +46,11 @@ func main() {
 		log.Fatal("Error Configuring DNS", zap.Error(err))
 	}
 
+	err = operator.SetDnsIpToContainers()
+	if err != nil {
+		log.Fatal("Error Set Ip DNS", zap.Error(err))
+	}
+
 	containers := operator.Ps()
 	for _, container := range containers {
 		log.Info("Found Container", zap.String("name", container.Names[0]), zap.String("image", container.Image), zap.String("id", container.ShortId))
