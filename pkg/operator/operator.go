@@ -37,6 +37,7 @@ type Operator struct {
 	traefikClient *traefik.TraefikClient
 	traefikId     string
 	token         string
+	dockerToken   string
 
 	notRunningContainers []string
 	networkNames         map[string]*map[string]struct{}
@@ -63,7 +64,17 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
-	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log, token: token}
+	l, err := cli.RegistryLogin(context.Background(), types.AuthConfig{
+		Username:      data.Username,
+		Password:      data.Password,
+		ServerAddress: data.ServerAddress,
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log, token: token, dockerToken: l.IdentityToken}
 }
 
 func (o *Operator) Wait() {
@@ -313,7 +324,9 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
 	log := o.log.Named("pull_image")
 
-	out, err := o.client.ImagePull(ctx, imageName, types.ImagePullOptions{})
+	out, err := o.client.ImagePull(ctx, imageName, types.ImagePullOptions{
+		RegistryAuth: o.dockerToken,
+	})
 	if err != nil {
 		log.Error("Error while pulling image", zap.String("image", imageName), zap.Error(err))
 		return
