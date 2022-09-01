@@ -6,20 +6,16 @@ import (
 	"github.com/slntopp/nocloud/pkg/nocloud"
 	"github.com/slntopp/nocloud/pkg/nocloud/auth"
 	"github.com/slntopp/nocloud/pkg/nocloud/schema"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"os"
 )
 
 var (
-	log         *zap.Logger
-	SIGNING_KEY []byte
+	log *zap.Logger
 )
 
 func init() {
 	log = nocloud.NewLogger()
-
-	viper.SetDefault("SIGNING_KEY", "seeeecreet")
-	SIGNING_KEY = []byte(viper.GetString("SIGNING_KEY"))
 }
 
 func main() {
@@ -31,6 +27,8 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file", zap.Error(err))
 	}
+
+	SIGNING_KEY := []byte(os.Getenv("SIGNING_KEY"))
 
 	auth.SetContext(log, SIGNING_KEY)
 	token, err := auth.MakeToken(schema.ROOT_ACCOUNT_KEY)
