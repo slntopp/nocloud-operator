@@ -533,7 +533,10 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 	}
 	labels := container.Config.Labels
 	if zoneLabelValue, ok := labels[dns.ZoneLabel]; ok {
-		ip, err := o.getIpInNetwork(ctx, id, labels[dns.NetworkLabel]) // TODO: handle error
+
+		net := labels[dns.NetworkLabel]
+
+		ip, err := o.getIpInNetwork(ctx, id, net) // TODO: handle error
 		if err != nil {
 			log.Error("Fail to get ip in zone", zap.String("container id", id))
 			return

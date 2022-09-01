@@ -17,7 +17,7 @@ func NewTraefikClient(ip string) *TraefikClient {
 func (c *TraefikClient) GetCountOfServices() int {
 	req, err := http.NewRequest("GET", "http://"+c.Ip+":8080/api/http/services", nil)
 	if err != nil {
-
+		return 0
 	}
 	resp, err := c.Do(req)
 	if err != nil {
