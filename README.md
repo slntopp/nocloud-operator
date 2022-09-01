@@ -1,8 +1,8 @@
-# Nocloud-operator
+# NoCloud Operator
 
-___
+NoCloud platform maintainance helper.
 
-## Nocloud-operator - util for updating container and images
+## Setup
 
 To get start you need __operator-config.yaml__ file
 
@@ -36,3 +36,7 @@ services:
       - ./docker-compose.yml:/docker-compose.yml
       - /var/run/docker.sock:/var/run/docker.sock
 ```
+
+## Configure details
+
+See [Labels reference](LABELS.md) to learn how to configure operators behaviour.
