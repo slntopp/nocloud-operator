@@ -50,3 +50,30 @@ If you have Coredns and `dns-mgmt` service set up you could use Operators help t
     | A | analytics | 300|
     | TXT | Example | 300|
     | TXT | Was changed by operator at 2022-09-01 14:00:55.160986678 +0000 UTC | 0|
+
+## Drivers setting
+If you have various drivers in your configuration, where other services use them use following labels:
+
+1. Driver
+
+    *  `nocloud.driver` - added to driver service
+
+2. Container using drivers
+
+    *  `nocloud.with_drivers` - added to service that use drivers
+
+### Examples of configuration
+
+#### Driver:
+```yaml
+labels:
+  - some other labels
+  - nocloud.driver=driver-name:port
+```
+
+#### Another service:
+```yaml
+labels:
+  - some other labels
+  - nocloud.with_drivers
+```
