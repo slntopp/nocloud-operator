@@ -1,6 +1,6 @@
 # NoCloud Operator
 
-NoCloud platform maintainance helper.
+NoCloud platform maintenance helper.
 
 ## Setup
 
