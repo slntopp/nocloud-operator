@@ -16,8 +16,8 @@ registries:
 #   serverAddress: "ghcr.io"
 
 dns:
-  -8.8.8.8
-  -8.8.4.4
+  - "8.8.8.8"
+  - "8.8.4.4"
 ```
 
 __Duration__ - the amount of time in __seconds__ after which the operator will start the update
