@@ -4,6 +4,9 @@
 
 Adding `nocloud.update` label to container will make Operator check for the new Image under same tag every N seconds(configurable in `operator-config.yml`).
 
+> **Note:**  
+Most of NoCloud Core and Drivers containers are already labeled with `nocloud.update`
+
 ## DNS Management
 
 If you have Coredns and `dns-mgmt` service set up you could use Operators help to maintain internal DNS. The following container types and labels are available:
