@@ -1,7 +1,10 @@
 package operator
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/slntopp/nocloud-operator/pkg/traefik"
@@ -23,11 +26,21 @@ import (
 	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/registry"
 	dockerClient "github.com/docker/docker/client"
 )
 
 var wg sync.WaitGroup
+
+func encodeToBase64(v interface{}) (string, error) {
+	var buf bytes.Buffer
+	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
+	err := json.NewEncoder(encoder).Encode(v)
+	if err != nil {
+		return "", err
+	}
+	encoder.Close()
+	return buf.String(), nil
+}
 
 type Operator struct {
 	client        *dockerClient.Client
@@ -68,10 +81,10 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
-	var l registry.AuthenticateOKBody
+	dockerToken := ""
 
 	if data.DockerRegistries.Username != "" && data.DockerRegistries.Password != "" && data.DockerRegistries.ServerAddress != "" {
-		l, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
+		_, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
 			Username:      data.DockerRegistries.Username,
 			Password:      data.DockerRegistries.Password,
 			ServerAddress: data.DockerRegistries.ServerAddress,
@@ -80,19 +93,26 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		if err != nil {
 			log.Fatal("No registry", zap.Error(err))
 		}
+
+		var dockerCreds = DockerCredentials{
+			Username:      data.DockerRegistries.Username,
+			Password:      data.DockerRegistries.Password,
+			ServerAddress: data.DockerRegistries.ServerAddress,
+		}
+
+		dockerToken, _ = encodeToBase64(dockerCreds)
 	}
 
 	operator := &Operator{
-		client:     cli,
-		containers: map[string]ContainerInfo{},
-		config:     data,
-		log:        log,
-		token:      token,
-		defaultDns: data.Dns,
-		drivers:    map[string]struct{}{},
+		client:      cli,
+		containers:  map[string]ContainerInfo{},
+		config:      data,
+		log:         log,
+		token:       token,
+		defaultDns:  data.Dns,
+		drivers:     map[string]struct{}{},
+		dockerToken: dockerToken,
 	}
-
-	operator.dockerToken = l.IdentityToken
 
 	return operator
 }
