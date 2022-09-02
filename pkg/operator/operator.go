@@ -10,7 +10,6 @@ import (
 	"github.com/slntopp/nocloud-operator/pkg/traefik"
 	"google.golang.org/grpc/metadata"
 	"io"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -70,7 +69,7 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		log.Fatal("Failed creating Client", zap.Error(err))
 	}
 
-	bytes, err := ioutil.ReadFile("operator-config.yml")
+	bytes, err := os.ReadFile("./operator-config.yml")
 	if err != nil {
 		log.Fatal("Failed reading operator config", zap.Error(err))
 	}
@@ -123,7 +122,7 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 func (o *Operator) Wait() {
 	wait := true
 	log := o.log.Named("wait")
-	config := readComposeConfig("docker-compose.yml", log)
+	config := readComposeConfig("./docker-compose.yml", log)
 	for wait {
 		list, err := o.client.ContainerList(context.Background(), types.ContainerListOptions{})
 		if err != nil {
@@ -306,7 +305,7 @@ func (o *Operator) ConnectToTraefik() {
 func (o *Operator) CheckTraefik(ctx context.Context) {
 	log := o.log.Named("check_traefik")
 	traefikServices := o.traefikClient.GetCountOfServices()
-	configServices := readComposeConfig("docker-compose.yml", log).Services
+	configServices := readComposeConfig("./docker-compose.yml", log).Services
 	filteredConfigServices := 0
 
 	for _, value := range configServices {
@@ -519,7 +518,7 @@ func (o *Operator) getContainer(ctx context.Context, containerId string) types.C
 func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer.Config, *map[string]struct{}) {
 	log := o.log.Named("get_container_compose_config")
 
-	composeConfig := readComposeConfig("docker-compose.yml", log)
+	composeConfig := readComposeConfig("./docker-compose.yml", log)
 
 	for _, serviceConfig := range composeConfig.Services {
 		if strings.HasSuffix(serviceConfig.Image, imageName) {
@@ -714,7 +713,7 @@ func (o *Operator) startErrorContainers(ctx context.Context) {
 }
 
 func readComposeConfig(path string, log *zap.Logger) Config {
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		log.Error("Error reading Compose file", zap.Error(err))
 	}
