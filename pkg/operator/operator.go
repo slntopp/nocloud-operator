@@ -153,19 +153,34 @@ func (o *Operator) ConfigureDns() error {
 		return err
 	}
 
-	dnsIp, dnsNetworkName := "", ""
+	dnsIp, dnsMgmtHost, dnsNetworkName := "", "", ""
+
+	dnsCheck, dnsMgmtCheck := false, false
 
 	for _, container := range containersList {
-		if _, serverLabelOk := container.Labels[dns.ServerLabel]; serverLabelOk {
+		if _, ok := container.Labels[dns.ServerLabel]; ok {
 			dnsIp, err = o.getIpInNetwork(ctx, container.ID, container.Labels[dns.NetworkLabel])
 			if err != nil {
 				return err
 			}
 			dnsNetworkName = container.Labels[dns.NetworkLabel]
+			dnsCheck = true
+		}
 
-			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp)
+		if _, ok := container.Labels[dns.ApiLabel]; ok {
+			containerInspect, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
+			if err != nil {
+				return err
+			}
+			dnsMgmtHost = containerInspect.Config.Hostname
+			dnsMgmtCheck = true
+		}
+
+		if dnsCheck && dnsMgmtCheck {
+			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp, dnsMgmtHost)
 			return nil
 		}
+
 	}
 	return errors.New("no dns server")
 }

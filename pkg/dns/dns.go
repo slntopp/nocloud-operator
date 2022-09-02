@@ -19,8 +19,15 @@ type DnsWrap struct {
 	log *zap.Logger
 }
 
-func NewDnsWrap(log *zap.Logger, network, dnsIp string) *DnsWrap {
-	host := os.Getenv("DNS_MGMT_HOST")
+func NewDnsWrap(log *zap.Logger, network, dnsIp, dnsMgmtHost string) *DnsWrap {
+	port := os.Getenv("DNS_MGMT_PORT")
+
+	if port == "" {
+		port = "8000"
+	}
+
+	host := dnsMgmtHost + ":" + port
+
 	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err.Error())
