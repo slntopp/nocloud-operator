@@ -51,7 +51,7 @@ type Operator struct {
 	traefikClient *traefik.TraefikClient
 	traefikId     string
 	token         string
-	dockerToken   string
+	dockerTokens  []string
 	defaultDns    []string
 
 	notRunningContainers []string
@@ -81,37 +81,40 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
-	dockerToken := ""
+	dockerTokens := []string{""}
 
-	if data.DockerRegistries.Username != "" && data.DockerRegistries.Password != "" && data.DockerRegistries.ServerAddress != "" {
-		_, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
-			Username:      data.DockerRegistries.Username,
-			Password:      data.DockerRegistries.Password,
-			ServerAddress: data.DockerRegistries.ServerAddress,
-		})
+	for _, registry := range data.DockerRegistries {
 
-		if err != nil {
-			log.Fatal("No registry", zap.Error(err))
+		if registry.Username != "" && registry.Password != "" && registry.ServerAddress != "" {
+			_, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
+				Username:      registry.Username,
+				Password:      registry.Password,
+				ServerAddress: registry.ServerAddress,
+			})
+
+			if err != nil {
+				log.Fatal("No registry", zap.Error(err))
+			}
+
+			var dockerCreds = Registries{
+				Username:      registry.Username,
+				Password:      registry.Password,
+				ServerAddress: registry.ServerAddress,
+			}
+
+			dockerToken, _ := encodeToBase64(dockerCreds)
+			dockerTokens = append(dockerTokens, dockerToken)
 		}
-
-		var dockerCreds = DockerCredentials{
-			Username:      data.DockerRegistries.Username,
-			Password:      data.DockerRegistries.Password,
-			ServerAddress: data.DockerRegistries.ServerAddress,
-		}
-
-		dockerToken, _ = encodeToBase64(dockerCreds)
 	}
-
 	operator := &Operator{
-		client:      cli,
-		containers:  map[string]ContainerInfo{},
-		config:      data,
-		log:         log,
-		token:       token,
-		defaultDns:  data.Dns,
-		drivers:     map[string]struct{}{},
-		dockerToken: dockerToken,
+		client:       cli,
+		containers:   map[string]ContainerInfo{},
+		config:       data,
+		log:          log,
+		token:        token,
+		defaultDns:   data.Dns,
+		drivers:      map[string]struct{}{},
+		dockerTokens: dockerTokens,
 	}
 
 	return operator
@@ -426,25 +429,27 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
 	log := o.log.Named("pull_image")
 
-	out, err := o.client.ImagePull(ctx, imageName, types.ImagePullOptions{
-		RegistryAuth: o.dockerToken,
-	})
-	if err != nil {
-		log.Error("Error while pulling image", zap.String("image", imageName), zap.Error(err))
-		return
-	}
-
-	defer func(out io.ReadCloser) {
-		err := out.Close()
+	for _, token := range o.dockerTokens {
+		out, err := o.client.ImagePull(ctx, imageName, types.ImagePullOptions{
+			RegistryAuth: token,
+		})
 		if err != nil {
-			log.Warn("Something's wrong while closing contaner pull err", zap.Error(err))
+			log.Error("Error while pulling image", zap.String("image", imageName), zap.Error(err))
+			continue
 		}
-	}(out)
 
-	_, err = io.Copy(os.Stdout, out)
-	if err != nil {
-		log.Error("Wrong stream", zap.Error(err))
-		return
+		defer func(out io.ReadCloser) {
+			err := out.Close()
+			if err != nil {
+				log.Warn("Something's wrong while closing contaner pull err", zap.Error(err))
+			}
+		}(out)
+
+		_, err = io.Copy(os.Stdout, out)
+		if err != nil {
+			log.Error("Wrong stream", zap.Error(err))
+			return
+		}
 	}
 }
 
