@@ -124,9 +124,19 @@ func (o *Operator) SetDrivers() error {
 
 	var containersWithDrivers = make([]string, 0)
 
+	driversPort := os.Getenv("DRIVER_PORT")
+	if driversPort == "" {
+		driversPort = "8080"
+	}
+
 	for _, container := range containersList {
-		if val, ok := container.Labels[dns.DriverLabel]; ok {
-			o.drivers[val] = struct{}{}
+		if _, ok := container.Labels[dns.DriverLabel]; ok {
+			containerInspect, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
+			if err != nil {
+				return err
+			}
+
+			o.drivers[fmt.Sprintf("%s:%s", containerInspect.Config.Hostname, driversPort)] = struct{}{}
 			continue
 		}
 
@@ -429,6 +439,18 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	labels["com.docker.compose.image"] = image.ID
 
 	o.mutex.Lock()
+	if _, ok := labels[dns.DriverLabel]; ok {
+		keyForDelete := ""
+		for key := range o.drivers {
+			cutKey, _, _ := strings.Cut(key, ":")
+			if strings.HasPrefix(containerId, cutKey) {
+				keyForDelete = key
+				break
+			}
+		}
+		delete(o.drivers, keyForDelete)
+	}
+
 	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
 		log.Error("Error while deleting old image and container", zap.Error(err))

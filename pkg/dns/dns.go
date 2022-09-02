@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"fmt"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"time"
@@ -21,12 +22,11 @@ type DnsWrap struct {
 
 func NewDnsWrap(log *zap.Logger, network, dnsIp, dnsMgmtHost string) *DnsWrap {
 	port := os.Getenv("DNS_MGMT_PORT")
-
 	if port == "" {
 		port = "8000"
 	}
 
-	host := dnsMgmtHost + ":" + port
+	host := fmt.Sprintf("%s:%s", dnsMgmtHost, port)
 
 	conn, err := grpc.Dial(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
