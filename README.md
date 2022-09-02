@@ -9,9 +9,15 @@ To get start you need __operator-config.yaml__ file
 ```yaml
 duration: 10
 composePrefix: "nocloud-operator_"
-username: "username"
-password: "pass"
-serverAddress: "ghcr.io"
+
+registries:
+#   username: "username"
+#   password: "pass"
+#   serverAddress: "ghcr.io"
+
+dns:
+  - "8.8.8.8"
+  - "8.8.4.4"
 ```
 
 __Duration__ - the amount of time in __seconds__ after which the operator will start the update
@@ -19,6 +25,8 @@ __Duration__ - the amount of time in __seconds__ after which the operator will s
 __ComposePrefix__ - name of project where you start you containers
 
 __Username__, __Password__, __ServerAddress__ - credentials for docker
+
+__DNS__ - array of default dns ips
 
 ### Example of docker-compose file for operator
 

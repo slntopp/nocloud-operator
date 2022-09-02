@@ -1,7 +1,10 @@
 package operator
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/slntopp/nocloud-operator/pkg/traefik"
@@ -28,6 +31,17 @@ import (
 
 var wg sync.WaitGroup
 
+func encodeToBase64(v interface{}) (string, error) {
+	var buf bytes.Buffer
+	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
+	err := json.NewEncoder(encoder).Encode(v)
+	if err != nil {
+		return "", err
+	}
+	encoder.Close()
+	return buf.String(), nil
+}
+
 type Operator struct {
 	client        *dockerClient.Client
 	containers    map[string]ContainerInfo
@@ -38,10 +52,13 @@ type Operator struct {
 	traefikId     string
 	token         string
 	dockerToken   string
+	defaultDns    []string
 
 	notRunningContainers []string
 	networkNames         map[string]*map[string]struct{}
 	endpoints            map[string]*EndpointsConfig
+
+	drivers map[string]struct{}
 
 	log *zap.Logger
 }
@@ -64,17 +81,40 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		log.Fatal("Failed Unmarshal operator config", zap.Error(err))
 	}
 
-	l, err := cli.RegistryLogin(context.Background(), types.AuthConfig{
-		Username:      data.Username,
-		Password:      data.Password,
-		ServerAddress: data.ServerAddress,
-	})
+	dockerToken := ""
 
-	if err != nil {
-		return nil
+	if data.DockerRegistries.Username != "" && data.DockerRegistries.Password != "" && data.DockerRegistries.ServerAddress != "" {
+		_, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
+			Username:      data.DockerRegistries.Username,
+			Password:      data.DockerRegistries.Password,
+			ServerAddress: data.DockerRegistries.ServerAddress,
+		})
+
+		if err != nil {
+			log.Fatal("No registry", zap.Error(err))
+		}
+
+		var dockerCreds = DockerCredentials{
+			Username:      data.DockerRegistries.Username,
+			Password:      data.DockerRegistries.Password,
+			ServerAddress: data.DockerRegistries.ServerAddress,
+		}
+
+		dockerToken, _ = encodeToBase64(dockerCreds)
 	}
 
-	return &Operator{client: cli, containers: map[string]ContainerInfo{}, config: data, log: log, token: token, dockerToken: l.IdentityToken}
+	operator := &Operator{
+		client:      cli,
+		containers:  map[string]ContainerInfo{},
+		config:      data,
+		log:         log,
+		token:       token,
+		defaultDns:  data.Dns,
+		drivers:     map[string]struct{}{},
+		dockerToken: dockerToken,
+	}
+
+	return operator
 }
 
 func (o *Operator) Wait() {
@@ -94,6 +134,47 @@ func (o *Operator) Wait() {
 	}
 }
 
+func (o *Operator) SetDrivers() error {
+	log := o.log.Named("set_drivers")
+	ctx := context.Background()
+	containersList, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var containersWithDrivers = make([]string, 0)
+
+	driversPort := os.Getenv("DRIVER_PORT")
+	if driversPort == "" {
+		driversPort = "8080"
+	}
+
+	for _, container := range containersList {
+		if _, ok := container.Labels[dns.DriverLabel]; ok {
+			containerInspect, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
+			if err != nil {
+				return err
+			}
+
+			o.drivers[fmt.Sprintf("%s:%s", containerInspect.Config.Hostname, driversPort)] = struct{}{}
+			continue
+		}
+
+		if _, ok := container.Labels[dns.WithDriversLabel]; ok {
+			containersWithDrivers = append(containersWithDrivers, container.ID)
+		}
+	}
+
+	for _, id := range containersWithDrivers {
+		err := o.recreateContainer(ctx, id)
+		if err != nil {
+			log.Fatal("Fail with drivers recreation", zap.String("err", err.Error()))
+		}
+	}
+
+	return nil
+}
+
 func (o *Operator) ConfigureDns() error {
 	log := o.log.Named("configure_dns")
 	ctx := context.Background()
@@ -102,19 +183,34 @@ func (o *Operator) ConfigureDns() error {
 		return err
 	}
 
-	dnsIp, dnsNetworkName := "", ""
+	dnsIp, dnsMgmtHost, dnsNetworkName := "", "", ""
+
+	dnsCheck, dnsMgmtCheck := false, false
 
 	for _, container := range containersList {
-		if _, serverLabelOk := container.Labels[dns.ServerLabel]; serverLabelOk {
+		if _, ok := container.Labels[dns.ServerLabel]; ok {
 			dnsIp, err = o.getIpInNetwork(ctx, container.ID, container.Labels[dns.NetworkLabel])
 			if err != nil {
 				return err
 			}
 			dnsNetworkName = container.Labels[dns.NetworkLabel]
+			dnsCheck = true
+		}
 
-			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp)
+		if _, ok := container.Labels[dns.ApiLabel]; ok {
+			containerInspect, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
+			if err != nil {
+				return err
+			}
+			dnsMgmtHost = containerInspect.Config.Hostname
+			dnsMgmtCheck = true
+		}
+
+		if dnsCheck && dnsMgmtCheck {
+			o.dnsWrap = dns.NewDnsWrap(log, dnsNetworkName, dnsIp, dnsMgmtHost)
 			return nil
 		}
+
 	}
 	return errors.New("no dns server")
 }
@@ -129,7 +225,7 @@ func (o *Operator) SetDnsIpToContainers() error {
 
 	for _, container := range containersList {
 		if _, ok := container.Labels[dns.DnsRequiredLabel]; ok {
-			err := o.restartWithDnsConfig(ctx, container.ID)
+			err := o.recreateContainer(ctx, container.ID)
 			if err != nil {
 				log.Fatal("Fail to set DNS ip", zap.String("err", err.Error()))
 			}
@@ -138,7 +234,7 @@ func (o *Operator) SetDnsIpToContainers() error {
 	return nil
 }
 
-func (o *Operator) restartWithDnsConfig(ctx context.Context, id string) error {
+func (o *Operator) recreateContainer(ctx context.Context, id string) error {
 	log := o.log.Named("restart_container_with_dns")
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, id, false)
 	if err != nil {
@@ -301,6 +397,12 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 
 	labels := container.Config.Labels
 
+	if val, ok := labels[dns.DriverLabel]; ok {
+		o.mutex.Lock()
+		o.drivers[val] = struct{}{}
+		o.mutex.Unlock()
+	}
+
 	if _, ok := container.Config.Labels[dns.UpdateLabel]; ok {
 		image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
 		if err != nil {
@@ -357,6 +459,18 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	labels["com.docker.compose.image"] = image.ID
 
 	o.mutex.Lock()
+	if _, ok := labels[dns.DriverLabel]; ok {
+		keyForDelete := ""
+		for key := range o.drivers {
+			cutKey, _, _ := strings.Cut(key, ":")
+			if strings.HasPrefix(containerId, cutKey) {
+				keyForDelete = key
+				break
+			}
+		}
+		delete(o.drivers, keyForDelete)
+	}
+
 	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
 		log.Error("Error while deleting old image and container", zap.Error(err))
@@ -463,9 +577,21 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	containerConfig.Labels = *labels
 
 	if _, ok := containerConfig.Labels[dns.DnsRequiredLabel]; ok {
-		hostCfg.DNS = []string{o.dnsWrap.DnsIp, "8.8.8.8", "8.8.4.4"}
+		hostCfg.DNS = []string{o.dnsWrap.DnsIp}
+		hostCfg.DNS = append(hostCfg.DNS, o.defaultDns...)
 		hostCfg.DNSSearch = []string{}
 		hostCfg.DNSOptions = []string{}
+	}
+
+	if _, ok := containerConfig.Labels[dns.WithDriversLabel]; ok {
+		drivers := make([]string, 0)
+
+		for key := range o.drivers {
+			drivers = append(drivers, key)
+		}
+
+		stringDrivers := strings.Join(drivers, " ")
+		containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("DRIVERS=%s", stringDrivers))
 	}
 
 	create, err := o.client.ContainerCreate(ctx, containerConfig, hostCfg, nil, nil, containerName)

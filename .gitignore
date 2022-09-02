@@ -1,6 +1,7 @@
 .idea
 reports
 reports/Corefile
+config
 .env
 docker-compose.yml
 traefik.yml
