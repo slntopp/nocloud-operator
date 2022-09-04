@@ -68,7 +68,7 @@ If you have various drivers in your configuration, where other services use them
 ```yaml
 labels:
   - some other labels
-  - nocloud.driver=driver-name:port
+  - nocloud.driver
 ```
 
 #### Another service:
