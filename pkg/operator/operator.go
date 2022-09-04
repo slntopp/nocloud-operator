@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"io"
 	"os"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -57,7 +59,7 @@ type Operator struct {
 	networkNames         map[string]*map[string]struct{}
 	endpoints            map[string]*EndpointsConfig
 
-	drivers map[string]struct{}
+	drivers []string
 
 	log *zap.Logger
 }
@@ -112,7 +114,7 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 		log:          log,
 		token:        token,
 		defaultDns:   data.Dns,
-		drivers:      map[string]struct{}{},
+		drivers:      []string{},
 		dockerTokens: dockerTokens,
 	}
 
@@ -134,47 +136,6 @@ func (o *Operator) Wait() {
 		log.Info("Waiting for all containers start")
 		time.Sleep(5 * time.Second)
 	}
-}
-
-func (o *Operator) SetDrivers() error {
-	log := o.log.Named("set_drivers")
-	ctx := context.Background()
-	containersList, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
-	if err != nil {
-		return err
-	}
-
-	var containersWithDrivers = make([]string, 0)
-
-	driversPort := os.Getenv("DRIVER_PORT")
-	if driversPort == "" {
-		driversPort = "8080"
-	}
-
-	for _, container := range containersList {
-		if _, ok := container.Labels[dns.DriverLabel]; ok {
-			containerInspect, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
-			if err != nil {
-				return err
-			}
-
-			o.drivers[fmt.Sprintf("%s:%s", containerInspect.Config.Hostname, driversPort)] = struct{}{}
-			continue
-		}
-
-		if _, ok := container.Labels[dns.WithDriversLabel]; ok {
-			containersWithDrivers = append(containersWithDrivers, container.ID)
-		}
-	}
-
-	for _, id := range containersWithDrivers {
-		err := o.recreateContainer(ctx, id)
-		if err != nil {
-			log.Fatal("Fail with drivers recreation", zap.String("err", err.Error()))
-		}
-	}
-
-	return nil
 }
 
 func (o *Operator) ConfigureDns() error {
@@ -380,6 +341,7 @@ func (o *Operator) ObserveContainers() {
 			wg.Wait()
 			time.Sleep(10 * time.Second)
 			o.CheckTraefik(ctx)
+			o.checkDrivers(ctx)
 			log.Info("Another cycle")
 		case err := <-errorsChan:
 			log.Error("Error in channel", zap.Error(err))
@@ -387,6 +349,53 @@ func (o *Operator) ObserveContainers() {
 			continue
 		}
 	}
+}
+
+func (o *Operator) checkDrivers(ctx context.Context) {
+	log := o.log.Named("check_drivers")
+	var drivers = make([]string, 0)
+
+	containersList, err := o.client.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		log.Error("Error to get conainers", zap.String("err", err.Error()))
+		return
+	}
+
+	driversPort := os.Getenv("DRIVER_PORT")
+	if driversPort == "" {
+		driversPort = "8080"
+	}
+
+	for _, container := range containersList {
+		if _, ok := container.Labels[dns.DriverLabel]; ok {
+			containerInspect, _, err := o.client.ContainerInspectWithRaw(ctx, container.ID, false)
+			if err != nil {
+				log.Error("Error to get conainers", zap.String("err", err.Error()))
+				continue
+			}
+
+			drivers = append(drivers, fmt.Sprintf("%s:%s", containerInspect.Config.Hostname, driversPort))
+			continue
+		}
+	}
+
+	sort.Strings(o.drivers)
+	sort.Strings(drivers)
+
+	if !reflect.DeepEqual(o.drivers, drivers) {
+		o.drivers = drivers
+
+		for _, container := range containersList {
+			if _, ok := container.Labels[dns.WithDriversLabel]; ok {
+				err := o.recreateContainer(ctx, container.ID)
+				if err != nil {
+					log.Error("Recreating container", zap.String("err", err.Error()))
+					return
+				}
+			}
+		}
+	}
+
 }
 
 func (o *Operator) checkHash(ctx context.Context, containerId string) {
@@ -398,12 +407,6 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 	}
 
 	labels := container.Config.Labels
-
-	if val, ok := labels[dns.DriverLabel]; ok {
-		o.mutex.Lock()
-		o.drivers[val] = struct{}{}
-		o.mutex.Unlock()
-	}
 
 	if _, ok := container.Config.Labels[dns.UpdateLabel]; ok {
 		image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
@@ -463,17 +466,6 @@ func (o *Operator) updateImageAndContainer(ctx context.Context, imageName string
 	labels["com.docker.compose.image"] = image.ID
 
 	o.mutex.Lock()
-	if _, ok := labels[dns.DriverLabel]; ok {
-		keyForDelete := ""
-		for key := range o.drivers {
-			cutKey, _, _ := strings.Cut(key, ":")
-			if strings.HasPrefix(containerId, cutKey) {
-				keyForDelete = key
-				break
-			}
-		}
-		delete(o.drivers, keyForDelete)
-	}
 
 	err := o.removeOldImageAndContainer(ctx, containerId, imageId)
 	if err != nil {
@@ -588,13 +580,7 @@ func (o *Operator) createNewContainer(ctx context.Context, imageName string, hos
 	}
 
 	if _, ok := containerConfig.Labels[dns.WithDriversLabel]; ok {
-		drivers := make([]string, 0)
-
-		for key := range o.drivers {
-			drivers = append(drivers, key)
-		}
-
-		stringDrivers := strings.Join(drivers, " ")
+		stringDrivers := strings.Join(o.drivers, " ")
 		containerConfig.Env = append(containerConfig.Env, fmt.Sprintf("DRIVERS=%s", stringDrivers))
 	}
 

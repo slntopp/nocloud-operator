@@ -39,11 +39,6 @@ func main() {
 	operator := dockerOperator.NewOperator(log, token)
 	operator.Wait()
 
-	err = operator.SetDrivers()
-	if err != nil {
-		log.Fatal("Error Configuring DNS", zap.Error(err))
-	}
-
 	err = operator.ConfigureDns()
 	if err != nil {
 		log.Fatal("Error Configuring DNS", zap.Error(err))
