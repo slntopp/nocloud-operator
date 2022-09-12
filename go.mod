@@ -3,7 +3,7 @@ module github.com/slntopp/nocloud-operator
 go 1.19
 
 require (
-	github.com/docker/docker v20.10.17+incompatible
+	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/joho/godotenv v1.4.0
 	github.com/slntopp/nocloud v0.0.15-r17
