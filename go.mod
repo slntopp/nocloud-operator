@@ -6,7 +6,7 @@ require (
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/joho/godotenv v1.4.0
-	github.com/slntopp/nocloud v0.0.15-r17
+	github.com/slntopp/nocloud v0.0.15-r19
 	go.uber.org/zap v1.23.0
 	google.golang.org/grpc v1.49.0
 	gopkg.in/yaml.v3 v3.0.1
