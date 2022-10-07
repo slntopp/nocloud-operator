@@ -11,7 +11,7 @@ duration: 10
 composePrefix: "nocloud-operator_"
 
 registries:
-#   username: "username"
+# - username: "username"
 #   password: "pass"
 #   serverAddress: "ghcr.io"
 
