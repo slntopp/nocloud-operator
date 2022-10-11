@@ -6,7 +6,7 @@ require (
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/joho/godotenv v1.4.0
-	github.com/slntopp/nocloud v0.0.16-r02
+	github.com/slntopp/nocloud v0.0.16-r03
 	go.uber.org/zap v1.23.0
 	google.golang.org/grpc v1.50.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -14,7 +14,7 @@ require (
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
-	github.com/arangodb/go-driver v1.3.3 // indirect
+	github.com/arangodb/go-driver v1.4.0 // indirect
 	github.com/arangodb/go-velocypack v0.0.0-20200318135517-5af53c29c67e // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect
