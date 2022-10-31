@@ -3,9 +3,10 @@ package dns
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"time"
+
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/slntopp/nocloud/pkg/dns/proto"
 	"go.uber.org/zap"
@@ -65,7 +66,7 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 	}
 	location.A[0].Ip = ip
 	location.A[0].Ttl = 300
-	location.Txt[0] = &proto.Record_TXT{Text: "Was changed by operator at " + time.Now().UTC().String()}
+	location.Txt[0] = &proto.Record_TXT{Text: "Was changed by operator at " + time.Now().UTC().String(), Ttl: 300}
 	get.Locations[aValue] = location
 
 	put, err := d.DnsClient.Put(ctx, get)
