@@ -332,7 +332,6 @@ func (o *Operator) ObserveContainers() {
 		case <-ticker.C:
 			var wg sync.WaitGroup
 			log.Info("count of containers", zap.Int("count", len(o.containers)))
-			log.Info("containers", zap.Any("c", o.containers))
 			wg.Add(len(o.containers))
 			o.startErrorContainers(ctx)
 			o.Ps()
@@ -340,7 +339,6 @@ func (o *Operator) ObserveContainers() {
 				go o.checkHash(ctx, container.Id, &wg)
 			}
 			wg.Wait()
-			time.Sleep(10 * time.Second)
 			o.CheckTraefik(ctx)
 			o.checkDrivers(ctx)
 			log.Info("Another cycle")
@@ -426,6 +424,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string, wg *sync.W
 		log.Info("Updating image and Container", zap.String("tag", image.RepoTags[0]), zap.String("container", container.Name))
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.Name, container.HostConfig, labels, endpointsConfig)
 	}
+	log.Info("Wg Done", zap.String("id", containerId))
 	wg.Done()
 }
 
