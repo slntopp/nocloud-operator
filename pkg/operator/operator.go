@@ -30,8 +30,6 @@ import (
 	dockerClient "github.com/docker/docker/client"
 )
 
-var wg sync.WaitGroup
-
 func encodeToBase64(v interface{}) (string, error) {
 	var buf bytes.Buffer
 	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
@@ -332,11 +330,14 @@ func (o *Operator) ObserveContainers() {
 	for {
 		select {
 		case <-ticker.C:
+			var wg sync.WaitGroup
+			log.Debug("count of containers", zap.Int("count", len(o.containers)))
+			log.Debug("containers", zap.Any("c", o.containers))
 			wg.Add(len(o.containers))
 			o.startErrorContainers(ctx)
 			o.Ps()
 			for _, container := range o.containers {
-				go o.checkHash(ctx, container.Id)
+				go o.checkHash(ctx, container.Id, &wg)
 			}
 			wg.Wait()
 			time.Sleep(10 * time.Second)
@@ -398,8 +399,7 @@ func (o *Operator) checkDrivers(ctx context.Context) {
 
 }
 
-func (o *Operator) checkHash(ctx context.Context, containerId string) {
-	defer wg.Done()
+func (o *Operator) checkHash(ctx context.Context, containerId string, wg *sync.WaitGroup) {
 	log := o.log.Named("check_hash")
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
@@ -426,6 +426,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string) {
 		log.Info("Updating image and Container", zap.String("tag", image.RepoTags[0]), zap.String("container", container.Name))
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.Name, container.HostConfig, labels, endpointsConfig)
 	}
+	wg.Done()
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
