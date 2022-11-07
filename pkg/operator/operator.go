@@ -331,8 +331,8 @@ func (o *Operator) ObserveContainers() {
 		select {
 		case <-ticker.C:
 			var wg sync.WaitGroup
-			log.Debug("count of containers", zap.Int("count", len(o.containers)))
-			log.Debug("containers", zap.Any("c", o.containers))
+			log.Info("count of containers", zap.Int("count", len(o.containers)))
+			log.Info("containers", zap.Any("c", o.containers))
 			wg.Add(len(o.containers))
 			o.startErrorContainers(ctx)
 			o.Ps()
