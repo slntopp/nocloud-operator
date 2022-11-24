@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/slntopp/nocloud/pkg/dns/proto"
+	"github.com/slntopp/nocloud-proto/dns"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -16,7 +16,7 @@ import (
 type DnsWrap struct {
 	Network   string
 	DnsIp     string
-	DnsClient proto.DNSClient
+	DnsClient dns.DNSClient
 
 	log *zap.Logger
 }
@@ -34,14 +34,14 @@ func NewDnsWrap(log *zap.Logger, network, dnsIp, dnsMgmtHost string) *DnsWrap {
 		log.Fatal(err.Error())
 	}
 
-	dnsClient := proto.NewDNSClient(conn)
+	dnsClient := dns.NewDNSClient(conn)
 	return &DnsWrap{Network: network, DnsIp: dnsIp, DnsClient: dnsClient, log: log}
 }
 
 func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue string) error {
 	log := d.log.Named("get")
 
-	zone := proto.Zone{Name: zoneName}
+	zone := dns.Zone{Name: zoneName}
 	get, err := d.DnsClient.Get(ctx, &zone)
 	if err != nil {
 		return err
@@ -51,22 +51,22 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 	if !ok {
 
 		if get.Locations == nil {
-			get.Locations = make(map[string]*proto.Record)
+			get.Locations = make(map[string]*dns.Record)
 		}
 
-		get.Locations[aValue] = &proto.Record{A: make([]*proto.Record_A, 1), Txt: make([]*proto.Record_TXT, 1)}
+		get.Locations[aValue] = &dns.Record{A: make([]*dns.Record_A, 1), Txt: make([]*dns.Record_TXT, 1)}
 	}
 
 	location := get.Locations[aValue]
 	if location.A[0] == nil {
-		location.A[0] = &proto.Record_A{}
+		location.A[0] = &dns.Record_A{}
 	}
 	if location.Txt[0] == nil {
-		location.Txt[0] = &proto.Record_TXT{}
+		location.Txt[0] = &dns.Record_TXT{}
 	}
 	location.A[0].Ip = ip
 	location.A[0].Ttl = 300
-	location.Txt[0] = &proto.Record_TXT{Text: "Was changed by operator at " + time.Now().UTC().String(), Ttl: 300}
+	location.Txt[0] = &dns.Record_TXT{Text: "Was changed by operator at " + time.Now().UTC().String(), Ttl: 300}
 	get.Locations[aValue] = location
 
 	put, err := d.DnsClient.Put(ctx, get)

@@ -7,6 +7,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/joho/godotenv v1.4.0
 	github.com/slntopp/nocloud v0.0.17
+	github.com/slntopp/nocloud-proto v0.0.0-20221122151021-7e8158586b2e
 	go.uber.org/zap v1.23.0
 	google.golang.org/grpc v1.51.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -36,7 +37,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/slntopp/nocloud-proto v0.0.0-20221122151021-7e8158586b2e // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
