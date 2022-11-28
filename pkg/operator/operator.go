@@ -336,7 +336,7 @@ func (o *Operator) ObserveContainers() {
 			o.startErrorContainers(ctx)
 			o.Ps()
 			for _, container := range o.containers {
-				go o.checkHash(ctx, container.Id, &wg)
+				go o.checkHash(ctx, container.Id, container.Image, &wg)
 			}
 			wg.Wait()
 			o.CheckTraefik(ctx)
@@ -397,7 +397,7 @@ func (o *Operator) checkDrivers(ctx context.Context) {
 
 }
 
-func (o *Operator) checkHash(ctx context.Context, containerId string, wg *sync.WaitGroup) {
+func (o *Operator) checkHash(ctx context.Context, containerId, containerName string, wg *sync.WaitGroup) {
 	log := o.log.Named("check_hash")
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, containerId, false)
 	if err != nil {
@@ -424,7 +424,7 @@ func (o *Operator) checkHash(ctx context.Context, containerId string, wg *sync.W
 		log.Info("Updating image and Container", zap.String("tag", image.RepoTags[0]), zap.String("container", container.Name))
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.Name, container.HostConfig, labels, endpointsConfig)
 	}
-	log.Info("Wg Done", zap.String("id", containerId))
+	log.Info("Wg Done", zap.String("id", containerId), zap.String("name", containerName))
 	wg.Done()
 }
 
