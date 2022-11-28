@@ -406,9 +406,12 @@ func (o *Operator) checkHash(ctx context.Context, containerId, containerName str
 
 	labels := container.Config.Labels
 
+	defer wg.Done()
+
 	if _, ok := container.Config.Labels[dns.UpdateLabel]; ok {
 		image, _, err := o.client.ImageInspectWithRaw(ctx, container.Image)
 		if err != nil {
+			log.Error("Image inspect with raw", zap.String("err", err.Error()))
 			return
 		}
 
@@ -425,7 +428,6 @@ func (o *Operator) checkHash(ctx context.Context, containerId, containerName str
 		o.updateImageAndContainer(ctx, image.RepoTags[0], image.ID, containerId, container.Name, container.HostConfig, labels, endpointsConfig)
 	}
 	log.Info("Wg Done", zap.String("id", containerId), zap.String("name", containerName))
-	wg.Done()
 }
 
 func (o *Operator) pullImage(ctx context.Context, imageName string) {
