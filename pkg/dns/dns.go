@@ -56,11 +56,12 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 		location = &dns.Record{A: make([]*dns.Record_A, 1), Txt: make([]*dns.Record_TXT, 1)}
 	}
 
-	if location.A[0] == nil {
-		location.A[0] = &dns.Record_A{}
+	if len(location.A) == 0 {
+		location.A = append(location.A, &dns.Record_A{})
 	}
-	if location.Txt[0] == nil {
-		location.Txt[0] = &dns.Record_TXT{}
+
+	if len(location.Txt) == 0 {
+		location.Txt = append(location.Txt, &dns.Record_TXT{})
 	}
 	location.A[0].Ip = ip
 	location.A[0].Ttl = 300
