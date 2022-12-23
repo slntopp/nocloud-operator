@@ -47,13 +47,12 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 		return err
 	}
 
+	if get.Locations == nil {
+		get.Locations = make(map[string]*dns.Record)
+	}
+
 	_, ok := get.Locations[aValue]
 	if !ok {
-
-		if get.Locations == nil {
-			get.Locations = make(map[string]*dns.Record)
-		}
-
 		get.Locations[aValue] = &dns.Record{A: make([]*dns.Record_A, 1), Txt: make([]*dns.Record_TXT, 1)}
 	}
 
