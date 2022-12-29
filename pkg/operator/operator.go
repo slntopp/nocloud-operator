@@ -322,6 +322,7 @@ func (o *Operator) ObserveContainers() {
 	log := o.log.Named("Observer")
 
 	ctx := context.Background()
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+o.token)
 	_, errorsChan := o.client.Events(ctx, types.EventsOptions{})
 
 	ticker := time.NewTicker(time.Duration(o.config.Duration) * time.Second)
