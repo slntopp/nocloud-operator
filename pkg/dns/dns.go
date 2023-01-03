@@ -47,6 +47,8 @@ func (d *DnsWrap) Get(ctx context.Context, zoneName string, ip string, aValue st
 		return err
 	}
 
+	log.Info("Locations", zap.Any("locs", get.Locations))
+
 	if get.Locations == nil {
 		get.Locations = make(map[string]*dns.Record)
 	}
