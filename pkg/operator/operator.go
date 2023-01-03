@@ -659,6 +659,8 @@ func (o *Operator) connectNetworks(ctx context.Context, containerId string, endp
 func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 	log := o.log.Named("configure_dns_mgmt_records")
 
+	log.Info("ContainerId", zap.String("id", id))
+
 	container, _, err := o.client.ContainerInspectWithRaw(ctx, id, false)
 	if err != nil {
 		return
@@ -666,13 +668,19 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 	labels := container.Config.Labels
 	if zoneLabelValue, ok := labels[dns.ZoneLabel]; ok {
 
+		log.Info("Container got zone label")
+
 		net := labels[dns.NetworkLabel]
 
 		ip, err := o.getIpInNetwork(ctx, id, net) // TODO: handle error
+
 		if err != nil {
 			log.Error("Fail to get ip in zone", zap.String("container id", id))
 			return
 		}
+
+		log.Info("Ip in net", zap.String("ip", ip), zap.String("net", net))
+
 		aValue := labels[dns.ALabel]
 		err = o.dnsWrap.Get(ctx, zoneLabelValue, ip, aValue)
 		if err != nil {
