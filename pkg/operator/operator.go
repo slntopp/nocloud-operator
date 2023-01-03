@@ -334,7 +334,6 @@ func (o *Operator) ObserveContainers() {
 			var wg sync.WaitGroup
 			log.Info("count of containers", zap.Int("count", len(o.containers)))
 			wg.Add(len(o.containers))
-			o.startErrorContainers(ctx)
 			o.Ps()
 			for _, container := range o.containers {
 				go o.checkHash(ctx, container.Id, container.Image, &wg)
@@ -687,26 +686,6 @@ func (o *Operator) configureDnsMgmtRecords(ctx context.Context, id string) {
 			log.Error("DNS Error", zap.Error(err))
 		}
 	}
-}
-
-func (o *Operator) startErrorContainers(ctx context.Context) {
-	if len(o.notRunningContainers) == 0 {
-		return
-	}
-	var tempIds []string
-	for _, value := range o.notRunningContainers {
-		err := o.client.ContainerStart(ctx, value, types.ContainerStartOptions{})
-		if err != nil {
-			networks, endpoints := o.networkNames[value], o.endpoints[value]
-			o.connectNetworks(ctx, value, networks, endpoints)
-			delete(o.networkNames, value)
-			delete(o.endpoints, value)
-			continue
-		}
-		tempIds = append(tempIds, value)
-	}
-	o.notRunningContainers = tempIds
-	o.CheckTraefik(ctx)
 }
 
 func readComposeConfig(path string, log *zap.Logger) Config {
