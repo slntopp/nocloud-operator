@@ -13,7 +13,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -276,10 +275,8 @@ func (o *Operator) CheckTraefik(ctx context.Context) {
 		}
 	}
 
-	log.Info("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-
-	log.Info(strconv.Itoa(traefikServices))
-	log.Info(strconv.Itoa(filteredConfigServices))
+	log.Info("Services from traefik", zap.Int("count", traefikServices))
+	log.Info("Services from config", zap.Int("count", filteredConfigServices))
 
 	if traefikServices != filteredConfigServices {
 		o.RestartTraefik(ctx, o.traefikId)
