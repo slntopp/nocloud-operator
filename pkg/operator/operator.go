@@ -250,7 +250,7 @@ func (o *Operator) ConnectToTraefik(host string) error {
 
 	for _, item := range list {
 		if item.Image == "traefik:latest" {
-			for key, _ := range item.NetworkSettings.Networks {
+			for key := range item.NetworkSettings.Networks {
 				if strings.HasSuffix(key, "proxy") {
 					o.traefikId = item.ID
 					log.Info("ID " + item.ID)
