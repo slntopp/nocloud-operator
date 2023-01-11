@@ -2,21 +2,35 @@ package traefik
 
 import (
 	"encoding/json"
+	"fmt"
 	"go.uber.org/zap"
 	"net/http"
 )
 
 type TraefikClient struct {
 	http.Client
-	Ip string
+	Host string
 }
 
-func NewTraefikClient(ip string) *TraefikClient {
-	return &TraefikClient{Client: http.Client{}, Ip: ip}
+func NewTraefikClient(host string) *TraefikClient {
+	return &TraefikClient{Client: http.Client{}, Host: host}
+}
+
+func (c *TraefikClient) Ping() error {
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:8080/api/version", c.Host), nil)
+	if err != nil {
+		return err
+	}
+	_, err = c.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *TraefikClient) GetCountOfServices(log *zap.Logger) int {
-	req, err := http.NewRequest("GET", "http://"+c.Ip+":8080/api/http/services", nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:8080/api/http/services", c.Host), nil)
 	if err != nil {
 		return 0
 	}

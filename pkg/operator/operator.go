@@ -237,27 +237,15 @@ func (o *Operator) recreateContainer(ctx context.Context, id string) error {
 	return nil
 }
 
-func (o *Operator) ConnectToTraefik() {
+func (o *Operator) ConnectToTraefik(host string) error {
 	log := o.log.Named("connection_to_traefik")
-	list, _ := o.client.ContainerList(context.Background(), types.ContainerListOptions{})
-
-	var ip string
-
-	for _, item := range list {
-		if item.Image == "traefik:latest" {
-			for key, net := range item.NetworkSettings.Networks {
-				if strings.HasSuffix(key, "proxy") {
-					ip = net.IPAddress
-					o.traefikId = item.ID
-					log.Info("IP " + ip)
-					log.Info("ID " + item.ID)
-					break
-				}
-			}
-			break
-		}
+	o.traefikClient = traefik.NewTraefikClient(host)
+	err := o.traefikClient.Ping()
+	if err != nil {
+		log.Error("Error", zap.String("err", err.Error()))
+		return err
 	}
-	o.traefikClient = traefik.NewTraefikClient(ip)
+	return nil
 }
 
 func (o *Operator) CheckTraefik(ctx context.Context) {

@@ -54,7 +54,10 @@ func main() {
 		log.Info("Found Container", zap.String("name", container.Names[0]), zap.String("image", container.Image), zap.String("id", container.ShortId))
 	}
 
-	operator.ConnectToTraefik()
+	err = operator.ConnectToTraefik("iproxy")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
 	operator.ObserveContainers()
 }
