@@ -245,6 +245,22 @@ func (o *Operator) ConnectToTraefik(host string) error {
 		log.Error("Error", zap.String("err", err.Error()))
 		return err
 	}
+
+	list, _ := o.client.ContainerList(context.Background(), types.ContainerListOptions{})
+
+	for _, item := range list {
+		if item.Image == "traefik:latest" {
+			for key, _ := range item.NetworkSettings.Networks {
+				if strings.HasSuffix(key, "proxy") {
+					o.traefikId = item.ID
+					log.Info("ID " + item.ID)
+					break
+				}
+			}
+			break
+		}
+	}
+
 	return nil
 }
 
