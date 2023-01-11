@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/slntopp/nocloud-operator/pkg/traefik"
 	"google.golang.org/grpc/metadata"
 	"io"
 	"os"
@@ -41,16 +40,16 @@ func encodeToBase64(v interface{}) (string, error) {
 }
 
 type Operator struct {
-	client        *dockerClient.Client
-	containers    map[string]ContainerInfo
-	config        OperatorConfig
-	dnsWrap       *dns.DnsWrap
-	mutex         sync.Mutex
-	traefikClient *traefik.TraefikClient
-	traefikId     string
-	token         string
-	dockerTokens  []string
-	defaultDns    []string
+	client     *dockerClient.Client
+	containers map[string]ContainerInfo
+	config     OperatorConfig
+	dnsWrap    *dns.DnsWrap
+	mutex      sync.Mutex
+	//traefikClient *traefik.TraefikClient
+	//traefikId     string
+	token        string
+	dockerTokens []string
+	defaultDns   []string
 
 	notRunningContainers []string
 	networkNames         map[string]*map[string]struct{}
