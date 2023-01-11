@@ -17,7 +17,7 @@ func NewTraefikClient(host string) *TraefikClient {
 }
 
 func (c *TraefikClient) Ping() error {
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:8080/api/version", c.Host), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:8080/api/version", c.Host), nil)
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func (c *TraefikClient) Ping() error {
 }
 
 func (c *TraefikClient) GetCountOfServices(log *zap.Logger) int {
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:8080/api/http/services", c.Host), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:8080/api/http/services", c.Host), nil)
 	if err != nil {
 		return 0
 	}
