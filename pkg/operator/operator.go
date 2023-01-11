@@ -237,6 +237,7 @@ func (o *Operator) recreateContainer(ctx context.Context, id string) error {
 	return nil
 }
 
+/*
 func (o *Operator) ConnectToTraefik(host string) error {
 	log := o.log.Named("connection_to_traefik")
 	o.traefikClient = traefik.NewTraefikClient(host)
@@ -263,7 +264,9 @@ func (o *Operator) ConnectToTraefik(host string) error {
 
 	return nil
 }
+*/
 
+/*
 func (o *Operator) CheckTraefik(ctx context.Context) {
 	log := o.log.Named("check_traefik")
 	traefikServices := o.traefikClient.GetCountOfServices(o.log.Named("traefik_containers"))
@@ -287,7 +290,9 @@ func (o *Operator) CheckTraefik(ctx context.Context) {
 		o.RestartTraefik(ctx, o.traefikId)
 	}
 }
+*/
 
+/*
 func (o *Operator) RestartTraefik(ctx context.Context, id string) {
 	log := o.log.Named("Restart traefik")
 	log.Info("Restart")
@@ -298,6 +303,7 @@ func (o *Operator) RestartTraefik(ctx context.Context, id string) {
 		return
 	}
 }
+*/
 
 func (o *Operator) Ps() map[string]ContainerInfo {
 	log := o.log.Named("ps")
@@ -341,7 +347,7 @@ func (o *Operator) ObserveContainers() {
 				go o.checkHash(ctx, container.Id, container.Image, &wg)
 			}
 			wg.Wait()
-			o.CheckTraefik(ctx)
+			//o.CheckTraefik(ctx)
 			o.checkDrivers(ctx)
 			log.Info("Another cycle")
 		case err := <-errorsChan:
