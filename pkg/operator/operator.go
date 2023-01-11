@@ -262,13 +262,14 @@ func (o *Operator) ConnectToTraefik() {
 
 func (o *Operator) CheckTraefik(ctx context.Context) {
 	log := o.log.Named("check_traefik")
-	traefikServices := o.traefikClient.GetCountOfServices()
+	traefikServices := o.traefikClient.GetCountOfServices(o.log.Named("traefik_containers"))
 	configServices := readComposeConfig("./docker-compose.yml", log).Services
 	filteredConfigServices := 0
 
 	for _, value := range configServices {
 		for _, label := range value.Labels {
 			if strings.HasPrefix(label, "traefik.enable") {
+				log.Info("From compose", zap.String("name", value.ContainerName))
 				filteredConfigServices += 1
 				break
 			}

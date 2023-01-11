@@ -2,6 +2,7 @@ package traefik
 
 import (
 	"encoding/json"
+	"go.uber.org/zap"
 	"net/http"
 )
 
@@ -14,7 +15,7 @@ func NewTraefikClient(ip string) *TraefikClient {
 	return &TraefikClient{Client: http.Client{}, Ip: ip}
 }
 
-func (c *TraefikClient) GetCountOfServices() int {
+func (c *TraefikClient) GetCountOfServices(log *zap.Logger) int {
 	req, err := http.NewRequest("GET", "http://"+c.Ip+":8080/api/http/services", nil)
 	if err != nil {
 		return 0
@@ -35,6 +36,7 @@ func (c *TraefikClient) GetCountOfServices() int {
 
 	for _, item := range services {
 		if item.Provider == "docker" {
+			log.Info("container", zap.String("name", item.Name))
 			counter += 1
 		}
 	}
