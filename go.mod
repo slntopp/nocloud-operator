@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/joho/godotenv v1.4.0
+	github.com/joho/godotenv v1.5.1
 	github.com/slntopp/nocloud v0.0.17
 	github.com/slntopp/nocloud-proto v0.0.0-20221122151021-7e8158586b2e
 	go.uber.org/zap v1.24.0
