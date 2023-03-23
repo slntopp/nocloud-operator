@@ -214,8 +214,11 @@ func (o *Operator) recreateContainer(ctx context.Context, id string) error {
 
 	endpointsConfig := getLinksAndAliases(container.NetworkSettings.Networks, container.ID)
 
-	duration := 5 * time.Second
-	err = o.client.ContainerStop(ctx, id, &duration)
+	options := dockerContainer.StopOptions{
+		Signal:  "SIGKILL",
+		Timeout: nil,
+	}
+	err = o.client.ContainerStop(ctx, id, options)
 	if err != nil {
 		return err
 	}
@@ -552,8 +555,11 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 }
 
 func (o *Operator) removeOldImageAndContainer(ctx context.Context, containerId, imageId string) error {
-	duration := 5 * time.Second
-	err := o.client.ContainerStop(ctx, containerId, &duration)
+	options := dockerContainer.StopOptions{
+		Signal:  "SIGKILL",
+		Timeout: nil,
+	}
+	err := o.client.ContainerStop(ctx, containerId, options)
 	if err != nil {
 		return err
 	}
