@@ -128,7 +128,7 @@ func (o *Operator) Wait() {
 		}
 
 		log.Info("docker-compose", zap.Int("count", len(list)))
-		log.Info("list", zap.Int("count", len(list)))
+		log.Info("list", zap.Int("count", len(config.Services)))
 		if len(config.Services) == len(list) {
 			wait = false
 		}
