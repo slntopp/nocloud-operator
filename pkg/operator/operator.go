@@ -126,6 +126,9 @@ func (o *Operator) Wait() {
 		if err != nil {
 			return
 		}
+
+		log.Info("docker-compose", zap.Int("count", len(list)))
+		log.Info("list", zap.Int("count", len(list)))
 		if len(config.Services) == len(list) {
 			wait = false
 		}
