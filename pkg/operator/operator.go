@@ -661,8 +661,10 @@ func (o *Operator) connectNetworks(ctx context.Context, containerId string, endp
 
 	for _, id := range networkIds {
 		o.client.NetworkConnect(ctx, id, containerId, &network.EndpointSettings{
-			Links:   config.Links,
-			Aliases: config.Aliases,
+			Links:     config.Links,
+			Aliases:   config.Aliases,
+			IPAddress: config.IPAddress,
+			Gateway:   config.Gateway,
 		})
 	}
 
@@ -779,8 +781,10 @@ func getLinksAndAliases(networks map[string]*network.EndpointSettings, id string
 		}
 
 		return &EndpointsConfig{
-			Links:   links,
-			Aliases: aliases,
+			Links:     links,
+			Aliases:   aliases,
+			IPAddress: value.IPAddress,
+			Gateway:   value.Gateway,
 		}
 	}
 	return nil
