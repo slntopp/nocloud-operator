@@ -547,8 +547,8 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			}
 			containerConfig.Volumes = volumesMap
 			networks := make(map[string]struct{}, 0)
-			for _, value := range serviceConfig.Networks {
-				networks[o.config.ComposePrefix+value] = struct{}{}
+			for key := range serviceConfig.Networks {
+				networks[o.config.ComposePrefix+key] = struct{}{}
 			}
 
 			return containerConfig, &networks
