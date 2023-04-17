@@ -554,6 +554,7 @@ func (o *Operator) getContainerComposeConfig(imageName string) (*dockerContainer
 			return containerConfig, &networks
 		}
 	}
+	log.Debug("Container not found", zap.String("image", imageName))
 	return nil, nil
 }
 
