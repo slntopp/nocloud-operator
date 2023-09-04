@@ -22,9 +22,9 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
-	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
+	types "github.com/docker/docker/api/types/registry"
 	dockerClient "github.com/docker/docker/client"
 )
 
