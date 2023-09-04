@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
 	dockerOperator "github.com/slntopp/nocloud-operator/pkg/operator"
 	"github.com/slntopp/nocloud/pkg/nocloud"
@@ -29,8 +30,15 @@ func main() {
 	}
 
 	SIGNING_KEY := []byte(os.Getenv("SIGNING_KEY"))
+	redisHost := os.Getenv("REDIS_HOST")
 
-	auth.SetContext(log, SIGNING_KEY)
+	log.Info("Connecting redis", zap.String("url", redisHost))
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisHost,
+		DB:   0, // use default DB
+	})
+
+	auth.SetContext(log, rdb, SIGNING_KEY)
 	token, err := auth.MakeToken(schema.ROOT_ACCOUNT_KEY)
 	if err != nil {
 		log.Fatal(err.Error())
