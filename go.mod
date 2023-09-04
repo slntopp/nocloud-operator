@@ -6,8 +6,8 @@ require (
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/joho/godotenv v1.5.1
-	github.com/slntopp/nocloud v0.0.18-0.20230904193757-6093c491d45c
-	github.com/slntopp/nocloud-proto v0.0.0-20230904193418-d69d29f48636
+	github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb
+	github.com/slntopp/nocloud-proto v0.0.0-20230904195054-4f2d1760c6b8
 	go.uber.org/zap v1.25.0
 	google.golang.org/grpc v1.57.0
 	gopkg.in/yaml.v3 v3.0.1

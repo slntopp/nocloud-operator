@@ -224,9 +224,12 @@ github.com/slntopp/nocloud v0.0.17 h1:6M4yIje/bt6BpAuZ8U17UDGHkotOCqVbwg4fgC5LpC
 github.com/slntopp/nocloud v0.0.17/go.mod h1:TJW/arwsY7oBU7/XYZC95vjNL6CGWuMwJ6lJGpPsVvE=
 github.com/slntopp/nocloud v0.0.18-0.20230904193757-6093c491d45c h1:sZM3AsqcCNMcuf/7d0umvi+TwzKWE3iWipYgtD9i0/I=
 github.com/slntopp/nocloud v0.0.18-0.20230904193757-6093c491d45c/go.mod h1:UlAcGiBZIJB1oDYt4+MILPJzC5UAdKniCqn3p1I2eeM=
+github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb h1:2cMt7JROFmM5i4/L6W3bWL7/7zLToSfD3gszMS79kzI=
+github.com/slntopp/nocloud v0.0.18-0.20230904195140-0e2e430146cb/go.mod h1:zRLD6OaWq0vlPTA+qo3ssEBFPjoHH6crpUpeRPgl9sw=
 github.com/slntopp/nocloud-proto v0.0.0-20221122151021-7e8158586b2e h1:NJXAtFQyhayy0Tw7Uks2K+/1B87BIKmWGy0bncaBhHk=
 github.com/slntopp/nocloud-proto v0.0.0-20221122151021-7e8158586b2e/go.mod h1:hYvYEdPrWlR/R1BBi4wEDodJF0twVYsy2KB6h/ypv7c=
 github.com/slntopp/nocloud-proto v0.0.0-20230904193418-d69d29f48636/go.mod h1:7A1kZNGXKKLhEnt2ELeb1e1XgeyAUkCpgxjyg/Vn5vg=
+github.com/slntopp/nocloud-proto v0.0.0-20230904195054-4f2d1760c6b8/go.mod h1:7A1kZNGXKKLhEnt2ELeb1e1XgeyAUkCpgxjyg/Vn5vg=
 github.com/spf13/afero v1.9.2 h1:j49Hj62F0n+DaZ1dDCvhABaPNSGNkt32oRFxI33IEMw=
 github.com/spf13/afero v1.9.2/go.mod h1:iUV7ddyEEZPO5gA3zD4fJt6iStLlL+Lg4m2cihcDf8Y=
 github.com/spf13/afero v1.9.5/go.mod h1:UBogFpq8E9Hx+xc5CNTTEpTnuHVmXDwZcZcE1eb/UhQ=
