@@ -16,15 +16,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/slntopp/nocloud-operator/pkg/dns"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
+	"github.com/docker/docker/api/types"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	dockerFilters "github.com/docker/docker/api/types/filters"
-	types "github.com/docker/docker/api/types/registry"
+	"github.com/docker/docker/api/types/network"
+	reg "github.com/docker/docker/api/types/registry"
 	dockerClient "github.com/docker/docker/client"
 )
 
@@ -83,7 +84,7 @@ func NewOperator(logger *zap.Logger, token string) *Operator {
 	for _, registry := range data.DockerRegistries {
 
 		if registry.Username != "" && registry.Password != "" && registry.ServerAddress != "" {
-			_, err = cli.RegistryLogin(context.Background(), types.AuthConfig{
+			_, err = cli.RegistryLogin(context.Background(), reg.AuthConfig{
 				Username:      registry.Username,
 				Password:      registry.Password,
 				ServerAddress: registry.ServerAddress,
