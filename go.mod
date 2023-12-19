@@ -10,7 +10,7 @@ require (
 	github.com/slntopp/nocloud v0.0.18
 	github.com/slntopp/nocloud-proto v0.0.0-20230928084001-11a2827103dc
 	go.uber.org/zap v1.26.0
-	google.golang.org/grpc v1.60.0
+	google.golang.org/grpc v1.60.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
